@@ -1,0 +1,4 @@
+# CODEOWNERS for MCP Authorization Extensions
+# The auth-wg team owns all files in this repository
+
+* @modelcontextprotocol/auth-wg
