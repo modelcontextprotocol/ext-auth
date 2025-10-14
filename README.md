@@ -14,6 +14,7 @@ These extensions are:
 This repository follows the [Model Context Protocol Governance](https://modelcontextprotocol.io/community/governance) process, with a dedicated set of maintainers for authorization extensions. See [MAINTAINERS.md](./MAINTAINERS.md) for the list of maintainers specific to this repository.
 
 All decisions regarding authorization extensions follow the same governance model as the core specification, including:
+
 - Specification Enhancement Proposals (SEPs)
 - Community discussion and consensus building
 - Maintainer review and approval
@@ -27,4 +28,3 @@ This repository follows the Model Context Protocol project policies:
 - [Contributing Guidelines](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/CONTRIBUTING.md)
 - [Security Policy](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/SECURITY.md)
 - [Antitrust Policy](https://github.com/modelcontextprotocol/modelcontextprotocol/blob/main/ANTITRUST.md)
-

@@ -1,0 +1,30 @@
+{
+  "name": "@modelcontextprotocol/ext-auth",
+  "private": true,
+  "version": "1.0.0",
+  "description": "MCP Authorization Extensions",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "prettier": {
+    "overrides": [
+      {
+        "files": "*.{md,mdx}",
+        "options": {
+          "proseWrap": "preserve"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "check:docs": "npm run check:docs:format && npm run check:docs:links",
+    "check:docs:format": "prettier --check \"**/*.{md,mdx}\"",
+    "check:docs:links": "find . -name '*.md' -not -path './node_modules/*' -exec markdown-link-check {} \\;",
+    "format": "prettier --write \"**/*.{md,mdx}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "markdown-link-check": "^3.12.1"
+  }
+}
