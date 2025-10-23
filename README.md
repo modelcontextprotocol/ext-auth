@@ -14,7 +14,6 @@ These extensions are:
 * [Client Credentials](https://github.com/modelcontextprotocol/ext-auth/blob/main/specification/draft/oauth-client-credentials.mdx)
 * [Enterprise-Managed Authorization](https://github.com/modelcontextprotocol/ext-auth/blob/main/specification/draft/enterprise-managed-authorization.mdx)
 
-
 ## Governance
 
 This repository follows the [Model Context Protocol Governance](https://modelcontextprotocol.io/community/governance) process, with a dedicated set of maintainers for authorization extensions. See [MAINTAINERS.md](./MAINTAINERS.md) for the list of maintainers specific to this repository.
