@@ -1,0 +1,549 @@
+# Workload Identity Federation
+
+## Introduction
+
+### Purpose and Scope
+
+This extension defines Workload Identity Federation for the Model Context
+Protocol, enabling autonomous MCP clients to access MCP servers using existing
+workload identity credentials without requiring separate client registration or
+long-lived credentials. This extension builds upon the baseline authorization
+requirements defined in the main Authorization specification.
+
+Workload Identity Federation is designed for scenarios where an MCP client
+operates as an autonomous workload - that is, the client authenticates and
+authorizes as itself rather than through an interactive OAuth authorization
+flow on behalf of an end-user. In these deployments, the MCP client effectively
+functions as a workload within a workload platform (such as Kubernetes or cloud
+provider environments). Like the Client Credentials extension, this pattern 
+addresses machine-to-machine authentication use cases.
+
+This extension allows an MCP client that already possesses a JWT credential
+(issued by its workload platform, SPIFFE implementation, or other trusted
+identity provider) to present that credential directly to an authorization
+server protecting an MCP server. The authorization server validates the JWT and
+issues a temporary access token suitable for accessing the MCP server.
+
+This approach eliminates the need for:
+- Client credentials (client secrets or private keys)
+- Client identifiers (client_id)
+- Client registration (including Dynamic Client Registration)
+- Managing separate credentials for each service the client needs to access
+
+Instead, MCP clients leverage their existing platform-provided workload identity
+and "federate" to other services through trust relationships configured in the
+authorization server. This significantly simplifies workload-to-service
+authentication patterns while maintaining security through proper issuer trust
+and claim-based authorization.
+
+### Extension Requirements
+
+This extension is OPTIONAL for MCP implementations. When adopted:
+
+- Implementations MUST conform to all requirements specified in this extension
+- Implementations MUST also conform to the baseline authorization requirements
+- This extension is specifically designed for HTTP-based transports
+- This extension is designed for autonomous MCP clients operating as workloads
+
+### Standards Compliance
+
+This extension is based on the following established specifications:
+
+- JSON Web Token (JWT) Profile for OAuth 2.0 Client Authentication and
+  Authorization Grants ([RFC 7523](https://datatracker.ietf.org/doc/html/rfc7523))
+- OpenID Connect Discovery 1.0
+  ([OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html))
+- OAuth 2.0 Authorization Server Metadata
+  ([RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414))
+- OAuth 2.0 Protected Resource Metadata
+  ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728))
+
+## Workload Identity Federation Flow
+
+### Overview
+
+Workload Identity Federation enables autonomous MCP clients to obtain access
+tokens for MCP servers by presenting existing JWT credentials issued to them as
+workloads. The flow involves three primary entities:
+
+- **MCP Client**: An autonomous client seeking access to an MCP server,
+  possessing a JWT credential from a trusted issuer. The MCP client functions
+  as a workload within its deployment environment.
+- **Authorization Server**: The OAuth 2.0 authorization server protecting the
+  MCP server, responsible for validating workload JWTs and issuing access
+  tokens
+- **MCP Server**: The resource server that accepts access tokens issued by the
+  authorization server
+
+The authorization server must be pre-configured with trust relationships to
+specific JWT issuers and rules determining which workload identities are
+authorized to receive access tokens.
+
+### Message Flow
+
+The complete Workload Identity Federation flow proceeds as follows:
+
+```
+┌──────────┐                                    ┌──────────────────┐
+│          │                                    │                  │
+│   MCP    │                                    │ Authorization    │
+│  Client  │                                    │ Server           │
+│          │                                    │                  │
+└────┬─────┘                                    └────────┬─────────┘
+     │                                                   │
+     │ 1. POST /token                                    │
+     │    grant_type=urn:ietf:params:oauth:grant-        │
+     │               type:jwt-bearer                     │
+     │    assertion=<JWT>                                │
+     │    resource=https://mcp.example.com               │
+     ├──────────────────────────────────────────────────►│
+     │                                                   │
+     │                                          2. Discover issuer
+     │                                             configuration
+     │                                             GET /.well-known/
+     │                                             openid-configuration
+     │                                                   │
+     │                                          3. Retrieve JWKs
+     │                                             from jwks_uri
+     │                                                   │
+     │                                          4. Verify JWT signature
+     │                                             and validate claims
+     │                                                   │
+     │ 5. Access Token Response                          │
+     │    {                                              │
+     │      "access_token": "...",                       │
+     │      "token_type": "Bearer",                      │
+     │      "expires_in": 3600                           │
+     │    }                                              │
+     │◄──────────────────────────────────────────────────┤
+     │                                                   │
+     │                                                   │
+┌────▼─────┐                                    ┌───────▼──────────┐
+│          │                                    │                  │
+│   MCP    │                                    │ MCP Server       │
+│  Client  │                                    │                  │
+└────┬─────┘                                    └────────┬─────────┘
+     │                                                   │
+     │ 6. JSON-RPC Request                               │
+     │    Authorization: Bearer <access_token>           │
+     │    POST /mcp                                      │
+     ├──────────────────────────────────────────────────►│
+     │                                                   │
+     │                                          7. Validate token
+     │                                             and process request
+     │                                                   │
+     │ 8. JSON-RPC Response                              │
+     │◄──────────────────────────────────────────────────┤
+     │                                                   │
+```
+
+### Flow Steps
+
+1. **Token Request**: The MCP client makes a POST request to the authorization
+   server's token endpoint using the JWT Bearer grant type as specified in
+   [RFC 7523 Section 2.1](https://datatracker.ietf.org/doc/html/rfc7523#section-2.1).
+   The request includes:
+   - `grant_type`: `urn:ietf:params:oauth:grant-type:jwt-bearer`
+   - `assertion`: The client's workload JWT credential
+   - `resource`: The canonical URI of the target MCP server (as defined in the
+     baseline MCP Authorization specification)
+
+2. **Issuer Discovery**: The authorization server extracts the `iss` (issuer)
+   claim from the JWT and performs issuer discovery by retrieving the OpenID
+   Connect configuration from `{issuer}/.well-known/openid-configuration` as
+   specified in
+   [OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html).
+   Alternatively, the OAuth 2.0 Authorization Server Metadata endpoint may be
+   used per [RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414).
+
+3. **Key Retrieval**: The authorization server retrieves the issuer's public
+   keys from the `jwks_uri` specified in the issuer's configuration document.
+
+4. **JWT Validation**: The authorization server validates the JWT according to
+   [RFC 7523 Section 3](https://datatracker.ietf.org/doc/html/rfc7523#section-3),
+   with considerations specified in this document. This includes verifying the
+   signature using the retrieved public keys and validating that the JWT claims
+   meet the authorization server's configured trust and authorization
+   requirements.
+
+5. **Access Token Issuance**: If validation succeeds, the authorization server
+   issues an access token suitable for accessing the specified MCP server and
+   returns it to the MCP client per
+   [RFC 7523 Section 2.1](https://datatracker.ietf.org/doc/html/rfc7523#section-2.1).
+
+6. **MCP Server Access**: The MCP client makes a JSON-RPC request to the MCP
+   server, including the access token in the `Authorization` header using the
+   `Bearer` authentication scheme as specified in the baseline MCP Authorization
+   specification.
+
+7. **Token Validation**: The MCP server validates the access token according to
+   the baseline MCP Authorization specification requirements, including
+   verifying the token was issued for the MCP server as the intended audience.
+
+8. **Response**: If the token is valid and the MCP client is authorized, the
+   MCP server processes the request and returns the JSON-RPC response.
+
+## JWT Requirements
+
+### JWT Format
+
+The workload JWT presented by the MCP client MUST be a signed JWT conforming to
+[RFC 7523](https://datatracker.ietf.org/doc/html/rfc7523). The JWT MUST contain
+at least the following claims:
+
+- `iss` (Issuer): Identifies the issuer of the JWT. This value is used for
+  issuer discovery and trust validation.
+- `sub` (Subject): Identifies the workload. This may be any identifier that
+  uniquely identifies the workload within the issuer's domain. Examples include
+  SPIFFE IDs, platform-specific workload identifiers, or service account names.
+- `aud` (Audience): Identifies the intended audience for the JWT. This MUST be
+  the authorization server's token endpoint URL.
+- `exp` (Expiration Time): The time after which the JWT MUST NOT be accepted.
+- `iat` (Issued At): The time at which the JWT was issued.
+- `jti` (JWT ID): A unique identifier for the JWT to prevent replay attacks.
+
+Additional claims MAY be present and MAY be used by the authorization server in
+making authorization decisions.
+
+Example JWT payload:
+
+```json
+{
+  "iss": "https://issuer.example.org",
+  "sub": "spiffe://example.org/ns/default/sa/customer-router-agent",
+  "aud": "https://auth.example.com/token",
+  "jti": "jwt-grant-id-x1y2z3a4",
+  "exp": 1744845092,
+  "iat": 1744841036
+}
+```
+
+### JWT Validation
+
+Authorization servers MUST validate the JWT according to
+[RFC 7523 Section 3](https://datatracker.ietf.org/doc/html/rfc7523#section-3),
+with the following considerations:
+
+- The `sub` (subject) claim identifies the workload but does not identify a
+  resource owner or correspond to an OAuth `client_id`.
+- The authorization server MUST verify the JWT signature using keys retrieved
+  through issuer discovery as described in this specification.
+- The authorization server MUST verify that the issuer is trusted according to
+  its configured trust relationships.
+- The authorization server MUST apply configured authorization rules to
+  determine whether the specific workload identified in the JWT claims should
+  receive an access token.
+
+### JWT Provisioning
+
+How MCP clients obtain their workload JWT credentials is outside the scope of
+this specification. Workload JWTs are typically provisioned by:
+
+- Workload platforms
+- SPIFFE implementations
+- Identity providers integrated with workload deployment systems
+
+The JWT provisioning mechanism relies on a separate registration or attestation
+process that establishes trust between the workload and the JWT issuer.
+
+## Authorization Server Requirements
+
+### Issuer Discovery
+
+Authorization servers MUST support OpenID Connect Discovery
+[OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html)
+or OAuth 2.0 Authorization Server Metadata
+[RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414) for discovering
+issuer configuration and retrieving issuer public keys.
+
+The issuer discovery process follows these steps:
+
+1. Extract the `iss` claim from the workload JWT
+2. Construct the well-known configuration URL:
+   `{iss}/.well-known/openid-configuration` (or the OAuth 2.0 equivalent)
+3. Retrieve the configuration document via HTTPS
+4. Extract the `jwks_uri` from the configuration
+5. Retrieve the issuer's public keys from the `jwks_uri` via HTTPS
+
+Example issuer configuration request:
+
+```http
+GET /.well-known/openid-configuration HTTP/1.1
+Host: issuer.example.org
+```
+
+Example issuer configuration response:
+
+```json
+{
+  "issuer": "https://issuer.example.org",
+  "jwks_uri": "https://issuer.example.org/.well-known/jwks.json",
+  "token_endpoint": "https://issuer.example.org/token"
+}
+```
+
+### Trust Configuration
+
+Authorization servers MUST implement mechanisms to configure:
+
+1. **Issuer Trust**: Which JWT issuers are trusted to authenticate workloads
+2. **Claim-Based Authorization**: Rules determining which workloads (based on
+   JWT claims) are authorized to receive access tokens for specific MCP servers
+
+The specific implementation of these configuration mechanisms is outside the
+scope of this specification. However, authorization servers SHOULD provide
+administrative interfaces or APIs for managing these trust relationships and
+authorization rules.
+
+### Token Endpoint
+
+Authorization servers supporting this extension MUST support the JWT Bearer
+grant type at their token endpoint as specified in
+[RFC 7523 Section 2.1](https://datatracker.ietf.org/doc/html/rfc7523#section-2.1).
+
+The token endpoint MUST accept requests with:
+- `grant_type`: `urn:ietf:params:oauth:grant-type:jwt-bearer`
+- `assertion`: The workload JWT
+- `resource`: The target MCP server URI (as specified in the baseline MCP
+  Authorization specification)
+
+Additional parameters MAY be supported but are not required by this
+specification.
+
+### Authorization Server Metadata
+
+Authorization servers supporting this extension MUST include the
+`grant_types_supported` field in their Authorization Server Metadata as defined
+in [RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414).
+
+The `grant_types_supported` array MUST include the value
+`urn:ietf:params:oauth:grant-type:jwt-bearer`.
+
+Example Authorization Server Metadata:
+
+```json
+{
+  "issuer": "https://auth.example.com",
+  "token_endpoint": "https://auth.example.com/token",
+  "grant_types_supported": [
+    "authorization_code",
+    "refresh_token",
+    "urn:ietf:params:oauth:grant-type:jwt-bearer"
+  ]
+}
+```
+
+## MCP Server Requirements
+
+MCP servers accepting access tokens issued through Workload Identity Federation
+MUST validate tokens according to the baseline MCP Authorization specification
+requirements.
+
+No additional requirements are imposed on MCP servers by this extension.
+
+## Examples
+
+### Complete Token Exchange Example
+
+**Token Request:**
+
+```http
+POST /token HTTP/1.1
+Host: auth.example.com
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer
+&assertion=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNpZ25pbmcta2V5
+LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlLm9yZyIsInN1YiI6InNwaWZmZ
+TovL2V4YW1wbGUub3JnL25zL2RlZmF1bHQvc2EvY3VzdG9tZXItcm91dGVyLWFnZW50IiwiY
+XVkIjoiaHR0cHM6Ly9hdXRoLmV4YW1wbGUuY29tL3Rva2VuIiwianRpIjoiand0LWdyYW50L
+WlkLXgxeTJ6M2E0IiwiZXhwIjoxNzQ0ODQ1MDkyLCJpYXQiOjE3NDQ4NDEwMzZ9.EXAMPLE
+_SIGNATURE
+&resource=https%3A%2F%2Fmcp.example.com
+```
+
+**Decoded JWT Assertion:**
+
+Header:
+```json
+{
+  "alg": "RS256",
+  "typ": "JWT",
+  "kid": "signing-key-1"
+}
+```
+
+Payload:
+```json
+{
+  "iss": "https://issuer.example.org",
+  "sub": "spiffe://example.org/ns/default/sa/customer-router-agent",
+  "aud": "https://auth.example.com/token",
+  "jti": "jwt-grant-id-x1y2z3a4",
+  "exp": 1744845092,
+  "iat": 1744841036
+}
+```
+
+**Token Response:**
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+Cache-Control: no-store
+
+{
+  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImF1dGgtc
+2VydmVyLWtleS0xIn0.eyJpc3MiOiJodHRwczovL2F1dGguZXhhbXBsZS5jb20iLCJzdWIiO
+iJzcGlmZmU6Ly9leGFtcGxlLm9yZy9ucy9kZWZhdWx0L3NhL2N1c3RvbWVyLXJvdXRlci1hZ
+2VudCIsImF1ZCI6Imh0dHBzOi8vbWNwLmV4YW1wbGUuY29tIiwiZXhwIjoxNzQ0ODQ0NjM2L
+CJpYXQiOjE3NDQ4NDEwMzYsInNjb3BlIjoibWNwOnJlYWQgbWNwOndyaXRlIn0.EXAMPLE_S
+IGNATURE",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scope": "mcp:read mcp:write"
+}
+```
+
+**MCP Server Request:**
+
+```http
+POST /mcp HTTP/1.1
+Host: mcp.example.com
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImF1dGg
+tc2VydmVyLWtleS0xIn0...
+
+{
+  "jsonrpc": "2.0",
+  "method": "tools/list",
+  "id": 1
+}
+```
+
+### Error Response Example
+
+When the JWT is invalid or the workload is not authorized:
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+Cache-Control: no-store
+
+{
+  "error": "invalid_grant",
+  "error_description": "The provided JWT assertion is invalid or the
+workload is not authorized to access the requested resource"
+}
+```
+
+## Trust Relationships
+
+For functional Workload Identity Federation, trust must be established at
+multiple levels:
+
+1. **Issuer Trust**: The authorization server MUST trust the JWT issuer
+2. **Workload Trust**: The authorization server MUST trust the specific workload
+   based on claims within the JWT
+
+These two trust relationships serve different purposes and SHOULD be managed
+independently.
+
+### Issuer Trust Relationship
+
+Issuer trust represents the foundational level of trust and determines whether
+JWT bearer tokens from a particular issuer are accepted. This trust relationship
+is between the authorization server and the JWT issuer only.
+
+Issuer trust is typically established at a global or tenant-wide level and is
+subject to organizational policy and governance controls. Changes to issuer
+trust affect all workloads associated with that issuer simultaneously.
+
+The mechanism for establishing issuer trust is implementation-specific and
+outside the scope of this specification. Common approaches include:
+- Maintaining an allowlist of trusted issuer URLs
+- Configuring issuer metadata endpoints for automatic key discovery
+- Associating issuers with specific tenants or organizational units
+
+### Workload Trust Relationship
+
+Workload trust builds upon issuer trust and focuses on the relationship between
+the authorization server and individual workloads. Once the JWT bearer token is
+authenticated (signature verified and issuer trusted), the authorization server
+must determine whether the specific workload identified in the JWT claims should
+receive an access token.
+
+Workload trust is typically established individually based on:
+- The `sub` (subject) claim identifying the workload
+- Additional claims such as namespace, tenant identifier, or service account
+- Combinations of multiple claims forming a compound identity
+
+This trust is subject to different policy and governance controls than issuer
+trust, often allowing more granular per-workload authorization decisions.
+
+### Multi-Tenancy Considerations
+
+When workload platforms or authorization servers support multiple tenants,
+additional care must be taken to prevent privilege escalation across tenant
+boundaries. 
+
+Authorization servers SHOULD:
+- Rely on JWT issuing keys bound to a single tenant of the workload platform,
+  rather than a single issuing key for the entire platform
+- Use specific JWT claims to prevent any JWT signed by the issuer from being
+  used to impersonate any principal
+- NOT solely rely on JWT claims that can be controlled by any tenant
+- MAY rely on a "tenant" claim if the claim value is issuer-controlled and
+  corresponds to a single tenant
+
+See the Security Considerations section for additional details on privilege
+escalation prevention.
+
+## Security Considerations
+
+Implementations adopting this extension MUST follow the security considerations
+outlined in:
+
+- [RFC 7523 Section 4 "Security Considerations"](https://datatracker.ietf.org/doc/html/rfc7523#section-4)
+- [RFC 7521 Section 8 "Security Considerations"](https://datatracker.ietf.org/doc/html/rfc7521#section-8)
+- The baseline MCP Authorization specification security requirements
+
+### JWT Validity and Lifetime
+
+JWT validity SHOULD be set to the shortest possible duration allowable by
+overall system availability constraints. Short-lived JWTs (on the order of
+seconds to minutes) reduce the window of opportunity for stolen JWTs to be
+misused.
+
+A secure channel (e.g., TLS) MUST be used when providing a JWT for
+authentication. JWTs SHOULD be protected from unauthorized access using
+operating system or platform access controls.
+
+### Identity Translation and Privilege Escalation
+
+The translation of workload JWT claims to MCP server access tokens represents a
+critical trust boundary. Improper configuration of this translation can lead to
+privilege escalation attacks, particularly in multi-tenant environments. See
+the "Multi-Tenancy Considerations" section for specific guidance on multi-tenant
+deployments.
+
+The following recommendations apply to all deployments:
+- Configuration SHOULD NOT permit the transcription of JWT claims to access
+  token claims without additional validation
+- Authorization servers SHOULD implement explicit allowlists or policies
+  defining which workload identities can access which MCP servers
+- Authorization servers SHOULD log and audit all token issuance decisions for
+  security monitoring
+
+### Issuer Discovery Security
+
+Authorization servers MUST validate issuer URLs and ensure they use HTTPS.
+Authorization servers SHOULD implement the following protections:
+
+- Maintain an allowlist of permitted issuer domains to prevent malicious issuer
+  discovery
+- Validate TLS certificates when retrieving issuer configuration and JWKs
+- Implement reasonable timeouts and rate limits on issuer discovery requests
+- Cache issuer configurations and JWKs appropriately to reduce attack surface
+- Monitor for issuer configuration changes that might indicate compromise
+
