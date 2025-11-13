@@ -11,30 +11,29 @@ long-lived credentials. This extension builds upon the baseline authorization
 requirements defined in the main Authorization specification.
 
 Workload Identity Federation is designed for scenarios where an MCP client
-operates as an autonomous workload - that is, the client authenticates and
-authorizes as itself rather than through an interactive OAuth authorization
-flow on behalf of an end-user. In these deployments, the MCP client effectively
-functions as a workload within a workload platform (such as Kubernetes or cloud
-provider environments). Like the Client Credentials extension, this pattern 
-addresses machine-to-machine authentication use cases.
+operates as an autonomous workload without any user interaction. In these 
+deployments, the MCP client is deployed as a workload within a workload 
+platform, such as Kubernetes, virtual machines, or a cloud provider
+environment.
 
 This extension allows an MCP client that already possesses a JWT credential
-(issued by its workload platform, SPIFFE implementation, or other trusted
-identity provider) to present that credential directly to an authorization
-server protecting an MCP server. The authorization server validates the JWT and
-issues a temporary access token suitable for accessing the MCP server.
+issued by its workload platform, SPIFFE implementation, or other trusted
+identity provider, to present that credential directly to an OAuth 
+authorization server protecting an MCP server. The OAuth authorization
+server validates the JWT and issues a temporary access token suitable for
+accessing the MCP server.
 
 This approach eliminates the need for:
-- Client credentials (client secrets or private keys)
+- Client secrets or private keys
 - Client identifiers (client_id)
 - Client registration (including Dynamic Client Registration)
 - Managing separate credentials for each service the client needs to access
 
 Instead, MCP clients leverage their existing platform-provided workload identity
 and "federate" to other services through trust relationships configured in the
-authorization server. This significantly simplifies workload-to-service
-authentication patterns while maintaining security through proper issuer trust
-and claim-based authorization.
+authorization server. This significantly simplifies MCP authorization, 
+improves security, and reduces operational complexity by removing long-lived
+secrets and client registration.
 
 ### Extension Requirements
 
@@ -64,11 +63,11 @@ This extension is based on the following established specifications:
 
 Workload Identity Federation enables autonomous MCP clients to obtain access
 tokens for MCP servers by presenting existing JWT credentials issued to them as
-workloads. The flow involves three primary entities:
+workloads by trusted issuers. The flow involves three primary entities:
 
 - **MCP Client**: An autonomous client seeking access to an MCP server,
   possessing a JWT credential from a trusted issuer. The MCP client functions
-  as a workload within its deployment environment.
+  as a workload within its deployment environment (e.g. Kubernetes).
 - **Authorization Server**: The OAuth 2.0 authorization server protecting the
   MCP server, responsible for validating workload JWTs and issuing access
   tokens
@@ -530,7 +529,7 @@ deployments.
 The following recommendations apply to all deployments:
 - Configuration SHOULD NOT permit the transcription of JWT claims to access
   token claims without additional validation
-- Authorization servers SHOULD implement explicit allowlists or policies
+- Authorization servers SHOULD implement explicit allow lists or policies
   defining which workload identities can access which MCP servers
 - Authorization servers SHOULD log and audit all token issuance decisions for
   security monitoring
