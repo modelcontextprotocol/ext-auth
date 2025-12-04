@@ -114,11 +114,7 @@ sequenceDiagram
    claim from the JWT and determine if it is a trusted issuer. If it trusts the 
    issuer, it MUST determine the location from which to retrieve the RFC7517 JWK key 
    set based on the `iss` claim. The JWK key set location MUST be a TLS protected 
-   URI. The authorization server MAY maintain a mapping between an issuer and the 
-   location of its JWK key set. Alternatively it MAY use a dynamic JWK issuer key 
-   discovery mechanism as defined by OpenID Connect Discovery 1.0 or obtain the 
-   location from the OAuth 2.0 Authorization Server Metadata endpoint may be used per 
-   [RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414).
+      URI. The authorization server MUST maintain a mapping between an issuer and the location of its JWK key set  through manual configuration. 
 
 3. **Obtain Issuer Keys**: The authorization server retrieves the JWK key set 
    containing the issuer's public keys from the TLS protected location specified in
