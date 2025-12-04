@@ -187,7 +187,7 @@ Example JWT payload:
 
 ```json
 {
-  "iss": "https://example.org",
+  "iss": "https://issuer.example.org",
   "sub": "spiffe://example.org/ns/default/sa/customer-router-agent",
   "aud": "https://auth.example.com/token",
   "jti": "jwt-grant-id-x1y2z3a4",
@@ -346,7 +346,7 @@ Header:
 Payload:
 ```json
 {
-  "iss": "spiffe://example.org",
+  "iss": "https://issuer.example.org",
   "sub": "spiffe://example.org/ns/default/sa/customer-router-agent",
   "aud": "https://auth.example.com/token",
   "jti": "jwt-grant-id-x1y2z3a4",
