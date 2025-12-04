@@ -231,15 +231,26 @@ Authorization servers MUST support OpenID Connect Discovery
 for discovering issuer configuration and retrieving issuer public keys
 as described in in this specification.
 
-### Issuer Key Retrieval
-The issuer keys MUST be published as a [RFC7517] JWK Key set and it MUST be 
-retrieved from a TLS protected URI.
+Example issuer configuration request:
 
-The authorization server MAY maintain a mapping between an issuer and the 
-location of its JWK key set. Alternatively it MAY use a dynamic JWK issuer key 
-discovery mechanism as defined by OpenID Connect Discovery 1.0 or obtain the 
-location from the OAuth 2.0 Authorization Server Metadata endpoint may be used per 
-[RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414).
+```http
+GET /.well-known/openid-configuration HTTP/1.1
+Host: issuer.example.org
+```
+
+Example issuer configuration response:
+
+```json
+{
+  "issuer": "https://issuer.example.org",
+  "jwks_uri": "https://issuer.example.org/.well-known/jwks.json",
+  "token_endpoint": "https://issuer.example.org/token"
+}
+```
+
+### Issuer Key Retrieval
+The issuer keys MUST be published as a [RFC7517](https://datatracker.ietf.org/doc/html/rfc7517) JWK Key set and it MUST be 
+retrieved from a TLS protected URI.
 
 ### Trust Configuration
 
