@@ -19,7 +19,7 @@ provider environments). Like the Client Credentials extension, this pattern
 addresses machine-to-machine authentication use cases.
 
 This extension allows an MCP client that already possesses a JWT credential
-(issued by its workload platform, SPIFFE implementation, or other trusted
+(issued by its workload platform, SPIFFE infrastructure, or other trusted
 identity provider) to present that credential directly to an authorization
 server protecting an MCP server. The authorization server validates the JWT and
 issues a temporary access token suitable for accessing the MCP server.
@@ -33,7 +33,7 @@ This approach eliminates the need for:
 Instead, MCP clients leverage their existing platform-provided workload identity
 and "federate" to other services through trust relationships configured in the
 authorization server. This significantly simplifies workload-to-service
-authentication patterns while maintaining security through proper issuer trust
+access patterns while maintaining security through proper issuer trust
 and claim-based authorization.
 
 ### Extension Requirements
@@ -53,10 +53,7 @@ This extension is based on the following established specifications:
   Authorization Grants ([RFC 7523](https://datatracker.ietf.org/doc/html/rfc7523))
 - OpenID Connect Discovery 1.0
   ([OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html))
-- OAuth 2.0 Authorization Server Metadata
-  ([RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414))
-- OAuth 2.0 Protected Resource Metadata
-  ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728))
+- JSON Web Key (JWK)([RFC7517](https://datatracker.ietf.org/doc/html/rfc7517))
 
 ## Workload Identity Federation Flow
 
@@ -103,7 +100,7 @@ sequenceDiagram
     Note over Auth: 5. Extract `jwks_uri`
     Auth->>JWKS_URI: 6. Request JWK Set
     JWKS_URI->>Auth: 7. Return JWK Set
-    Note over Auth: 8. Validate JWT
+    Note over Auth: 8. Validate JWT<br/>Authorization Grant
     Auth->>Client: 9. Return Access Token
     Client->>Server: 10. MCP Server Access
     Note over Server: 11. Validate Access Token
@@ -112,8 +109,9 @@ sequenceDiagram
 
 ### Flow Steps
 
-1. **Request Access Token**: The MCP client makes a POST request to the authorization
-   server's token endpoint using the JWT Bearer grant type as specified in
+1. **Request Access Token**: The MCP client requests an access token through a
+   POST request to the authorization server's token endpoint using the JWT Bearer
+   grant type as specified in
    [RFC 7523 Section 2.1](https://datatracker.ietf.org/doc/html/rfc7523#section-2.1).
    The request includes:
    - `grant_type`: `urn:ietf:params:oauth:grant-type:jwt-bearer`
@@ -124,14 +122,14 @@ sequenceDiagram
 2. **Construct OpenID Provider Discovery Endpoint URL**: The authorization server extracts the `iss` (issuer)
    claim from the JWT and determines if it is a trusted issuer. If the issuer is
    trusted, the authorization server constructs the OpenID Provider Discovery Endpoint URL from the issuer
-   claim as defined in Section 4 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig).
+   claim as described in Section 4 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig).
 
 3. **Request OpenID Provider Configuration Document**: The authorization server requests the OpenID Provider Configuration Document
-   using the URL constructed in Step 2 as described in Section 4.1 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationRequest).
+   as described in Section 4.1 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationRequest).
 
 4. **Return OpenID Provider Configuration Document** The OpenID Provider Configuration Document is returned as described in Section 4.2 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse). 
 
-5. **Extrack `jwks_uri`**: The authorization server validates the OpenID Provider Configuration Document as
+5. **Extract `jwks_uri`**: The authorization server validates the OpenID Provider Configuration Document as
    described in Section 4.3 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationValidation) and extracts the `jwks_uri` configuration information.
 
 6. **Request JWK Set**: The authorization server retrieves the
@@ -141,7 +139,8 @@ sequenceDiagram
 
 7. **Return JWK Set**: The JWK set is returned from the TLS protected location.
 
-8. **Validate JWT**: The authorization server validates the JWT according to
+8. **Validate JWT Authorization Grant**: The authorization server validates the
+   JWT authorization grant according to
    [RFC 7523 Section 3](https://datatracker.ietf.org/doc/html/rfc7523#section-3),
    with considerations specified in this document. This includes verifying the
    signature using the retrieved public keys and validating that the JWT claims
@@ -443,7 +442,7 @@ outside the scope of this specification. Common approaches include:
 
 Workload trust builds upon issuer trust and focuses on the relationship between
 the authorization server and individual workloads. Once the JWT bearer token is
-authenticated (signature verified and issuer trusted), the authorization server
+validated (signature verified and issuer trusted), the authorization server
 must determine whether the specific workload identified in the JWT claims should
 receive an access token.
 
@@ -463,12 +462,12 @@ boundaries.
 
 Authorization servers SHOULD:
 - Rely on JWT issuing keys bound to a single tenant of the workload platform,
-  rather than a single issuing key for the entire platform
+  rather than a single issuing key for all tenants in a platform.
 - Use specific JWT claims to prevent any JWT signed by the issuer from being
-  used to impersonate any principal
-- NOT solely rely on JWT claims that can be controlled by any tenant
+  used to impersonate any principal.
+- NOT solely rely on JWT claims that can be controlled by any tenant.
 - MAY rely on a "tenant" claim if the claim value is issuer-controlled and
-  corresponds to a single tenant
+  corresponds to a single tenant.
 
 See the Security Considerations section for additional details on privilege
 escalation prevention.
@@ -479,7 +478,8 @@ Implementations adopting this extension MUST follow the security considerations
 outlined in:
 
 - [RFC 7523 Section 4 "Security Considerations"](https://datatracker.ietf.org/doc/html/rfc7523#section-4)
-- [RFC 7521 Section 8 "Security Considerations"](https://datatracker.ietf.org/doc/html/rfc7521#section-8)
+- [RFC 7517 Section 9 "Security Considerations"](https://datatracker.ietf.org/doc/html/rfc7517#section-9)
+- [OpenID Connect Discovery 1.0, Section 7 "Security Considerations"](https://openid.net/specs/openid-connect-discovery-1_0.html#Security)
 - The baseline MCP Authorization specification security requirements
 
 ### JWT Validity and Lifetime
@@ -490,8 +490,8 @@ seconds to minutes) reduce the window of opportunity for stolen JWTs to be
 misused.
 
 A secure channel (e.g., TLS) MUST be used when providing a JWT for
-authentication. JWTs SHOULD be protected from unauthorized access using
-operating system or platform access controls.
+Workload IDentity Federation. JWTs SHOULD be protected from unauthorized
+access using operating system or platform access controls.
 
 ### Identity Translation and Privilege Escalation
 
