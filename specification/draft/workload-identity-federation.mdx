@@ -85,32 +85,20 @@ The message flow combines using a JWT as an authorization grant as define in [RF
 The complete Workload Identity Federation flow proceeds as follows:
 
 ```
-┌──────────┐             ┌──────────────────┐             ┌──────────┐
-│          │             │                  │             │          │
-│   MCP    │             │ Authorization    │             │   MCP    │
-│  Client  │             │ Server           │             │  Server  │ 
-│          │             │                  │             │          │
-└──────────┘             └──────────────────┘             └──────────┘
-     │                            │                             │
-     │ 1. Request Access Token    │                             │
-     │--------------------------->│                             │
-     │                            │                             │
-     │                2. Determine Issuer Key Location          │
-     │                            │                             │
-     │                  3. Obtain Issuer Keys                   │
-     │                            │                             │
-     │                    4. Validate JWT                       │
-     │                            │                             │
-     │ 5. Return Access Token     │                             │
-     │<---------------------------│                             │
-     │ 6. MCP Server Access                                     │
-     │--------------------------------------------------------->│
-     │                                                          │
-     │                                              7. Validate Access Token
-     │               8. MCP Server Response                     │
-     │<---------------------------------------------------------│
-
-```
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Auth as Authorization Server
+    participant Server as MCP Server
+    
+    Client->>Auth: 1. Request Access Token
+    Note over Auth: 2. Determine Issuer Key Location
+    Note over Auth: 3. Obtain Issuer Keys
+    Note over Auth: 4. Validate JWT
+    Auth->>Client: 5. Return Access Token
+    Client->>Server: 6. MCP Server Access
+    Note over Server: 7. Validate Access Token
+    Server->>Client: 8. MCP Server Response
 ### Flow Steps
 
 1. **Request Access Token**: The MCP client makes a POST request to the authorization
