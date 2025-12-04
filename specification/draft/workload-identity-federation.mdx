@@ -75,7 +75,7 @@ workloads. The flow involves three primary entities:
 - **MCP Server**: The resource server that accepts access tokens issued by the
   authorization server
 
-The authorization server must be pre-configured with trust relationships to
+The authorization server MUST be pre-configured with trust relationships to
 specific JWT issuers and rules determining which workload identities are
 authorized to receive access tokens.
 
@@ -96,7 +96,7 @@ sequenceDiagram
     Note over Auth: 2. Construct OpenID Provider Discovery Endpoint URL
     Auth->>OIDC: 3. Request OpenID Provider Configuration Document
     OIDC->>Auth: 4. Return OpenID Provider Configuration Document
-    Note over Auth: 5. Extract jwks_uri
+    Note over Auth: 5. Extract `jwks_uri`
     Auth->>JWKS_URI: 6. Request JWK Set
     JWKS_URI->>Auth: 7. Return JWK Set
     Note over Auth: 8. Validate JWT
@@ -127,13 +127,13 @@ sequenceDiagram
 
 4. **Return OpenID Provider Configuration Document** The OpenID Provider Configuration Document is returned as described in Section 4.2 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse). 
 
-5. **Extrack jwks_uri**: The authorization server validates the OpenID Provider Configuration Document as
-   described in Section 4.3 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationValidation) and extracts the 'jwks_uri' configuration information.
+5. **Extrack `jwks_uri`**: The authorization server validates the OpenID Provider Configuration Document as
+   described in Section 4.3 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationValidation) and extracts the `jwks_uri` configuration information.
 
 6. **Request JWK Set**: The authorization server retrieves the
    [RFC7517](https://datatracker.ietf.org/doc/html/rfc7517) JWK set 
    containing the issuer's public keys from the TLS protected location specified by
-   'jwks_uri' configuration information.
+   `jwks_uri` configuration information.
 
 7. **Return JWK Set**: The JWK set is returned from the TLS protected location.
 
@@ -187,7 +187,7 @@ Example JWT payload:
 
 ```json
 {
-  "iss": "spiffe://example.org",
+  "iss": "https://example.org",
   "sub": "spiffe://example.org/ns/default/sa/customer-router-agent",
   "aud": "https://auth.example.com/token",
   "jti": "jwt-grant-id-x1y2z3a4",
@@ -225,6 +225,11 @@ The JWT provisioning mechanism relies on a separate registration or attestation
 process that establishes trust between the workload and the JWT issuer.
 
 ## Authorization Server Requirements
+### Issuer Key Discovery
+Authorization servers MUST support OpenID Connect Discovery
+[OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html)
+for discovering issuer configuration and retrieving issuer public keys
+as described in in this specification.
 
 ### Issuer Key Retrieval
 The issuer keys MUST be published as a [RFC7517] JWK Key set and it MUST be 
