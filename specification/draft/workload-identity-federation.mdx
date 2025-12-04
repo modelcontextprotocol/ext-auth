@@ -80,25 +80,32 @@ specific JWT issuers and rules determining which workload identities are
 authorized to receive access tokens.
 
 ### Message Flow
-The message flow combines using a JWT as an authorization grant as define in [RFC7523](https://datatracker.ietf.org/doc/html/rfc7523) with retrieving a [RFC7517](https://datatracker.ietf.org/doc/html/rfc7517) JWK Key set from a TLS secured URI
+The message flow combines using a JWT as an authorization grant as defined in [RFC7523](https://datatracker.ietf.org/doc/html/rfc7523) with retrieving a [RFC7517](https://datatracker.ietf.org/doc/html/rfc7517) JWK Key set from a TLS secured URI
 
 The complete Workload Identity Federation flow proceeds as follows:
 
-```
 ```mermaid
 sequenceDiagram
     participant Client as MCP Client
-    participant Auth as Authorization Server
+    participant Auth as Authorization<br/>Server
+    participant OIDC as OIDC<br/>Discovery<br/>Endpoint
+    participant JWKS_URI as JWK Set<br/>Location
     participant Server as MCP Server
     
     Client->>Auth: 1. Request Access Token
-    Note over Auth: 2. Determine Issuer Key Location
-    Note over Auth: 3. Obtain Issuer Keys
-    Note over Auth: 4. Validate JWT
-    Auth->>Client: 5. Return Access Token
-    Client->>Server: 6. MCP Server Access
-    Note over Server: 7. Validate Access Token
-    Server->>Client: 8. MCP Server Response
+    Note over Auth: 2. Construct OpenID Provider Discovery Endpoint URL
+    Auth->>OIDC: 3. Request OpenID Provider Configuration Document
+    OIDC->>Auth: 4. Return OpenID Provider Configuration Document
+    Note over Auth: 5. Extract jwks_uri
+    Auth->>JWKS_URI: 6. Request JWK Set
+    JWKS_URI->>Auth: 7. Return JWK Set
+    Note over Auth: 8. Validate JWT
+    Auth->>Client: 9. Return Access Token
+    Client->>Server: 10. MCP Server Access
+    Note over Server: 11. Validate Access Token
+    Server->>Client: 12. MCP Server Response
+```
+
 ### Flow Steps
 
 1. **Request Access Token**: The MCP client makes a POST request to the authorization
@@ -110,29 +117,39 @@ sequenceDiagram
    - `resource`: The canonical URI of the target MCP server (as defined in the
      baseline MCP Authorization specification)
 
-2. **Determine Issuer Key Location**: The authorization server extracts the `iss` (issuer)
-   claim from the JWT and determine if it is a trusted issuer. If it trusts the 
-   issuer, it MUST determine the location from which to retrieve the RFC7517 JWK key 
-   set based on the `iss` claim. The JWK key set location MUST be a TLS protected 
-      URI. The authorization server MUST maintain a mapping between an issuer and the location of its JWK key set  through manual configuration. 
+2. **Construct OpenID Provider Discovery Endpoint URL**: The authorization server extracts the `iss` (issuer)
+   claim from the JWT and determines if it is a trusted issuer. If the issuer is
+   trusted, the authorization server constructs the OpenID Provider Discovery Endpoint URL from the issuer
+   claim as defined in Section 4 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig).
 
-3. **Obtain Issuer Keys**: The authorization server retrieves the JWK key set 
-   containing the issuer's public keys from the TLS protected location specified in
-   the issuer's configuration document.
+3. **Request OpenID Provider Configuration Document**: The authorization server requests the OpenID Provider Configuration Document
+   using the URL constructed in Step 2 as described in Section 4.1 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationRequest).
 
-4. **Validate JWT**: The authorization server validates the JWT according to
+4. **Return OpenID Provider Configuration Document** The OpenID Provider Configuration Document is returned as described in Section 4.2 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationResponse). 
+
+5. **Extrack jwks_uri**: The authorization server validates the OpenID Provider Configuration Document as
+   described in Section 4.3 of [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfigurationValidation) and extracts the 'jwks_uri' configuration information.
+
+6. **Request JWK Set**: The authorization server retrieves the
+   [RFC7517](https://datatracker.ietf.org/doc/html/rfc7517) JWK set 
+   containing the issuer's public keys from the TLS protected location specified by
+   'jwks_uri' configuration information.
+
+7. **Return JWK Set**: The JWK set is returned from the TLS protected location.
+
+8. **Validate JWT**: The authorization server validates the JWT according to
    [RFC 7523 Section 3](https://datatracker.ietf.org/doc/html/rfc7523#section-3),
    with considerations specified in this document. This includes verifying the
    signature using the retrieved public keys and validating that the JWT claims
    meet the authorization server's configured trust and authorization
    requirements.
 
-5. **Return Access Token**: If JWT validation succeeds, the authorization server
+9. **Return Access Token**: If JWT validation succeeds, the authorization server
    issues an access token suitable for accessing the specified MCP server and
    returns it to the MCP client per
    [RFC 7523 Section 2.1](https://datatracker.ietf.org/doc/html/rfc7523#section-2.1).
 
-6. **MCP Server Access**: The MCP client makes a JSON-RPC request to the MCP
+10. **MCP Server Access**: The MCP client makes a JSON-RPC request to the MCP
    server, including the access token in the `Authorization` header using the
    `Bearer` authentication scheme as specified in the baseline MCP Authorization
    specification.
