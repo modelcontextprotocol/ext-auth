@@ -80,7 +80,11 @@ specific JWT issuers and rules determining which workload identities are
 authorized to receive access tokens.
 
 ### Message Flow
-The message flow combines using a JWT as an authorization grant as defined in [RFC7523](https://datatracker.ietf.org/doc/html/rfc7523) with retrieving a [RFC7517](https://datatracker.ietf.org/doc/html/rfc7517) JWK Key set from a TLS secured URI
+The message flow combines using a JWT as an authorization grant as defined in
+[RFC7523](https://datatracker.ietf.org/doc/html/rfc7523) with automated issuer
+discovery as described in [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html)
+to obtain the [RFC7517](https://datatracker.ietf.org/doc/html/rfc7517) JWK
+Key set which is used to validate the JWT authorization grant.
 
 The complete Workload Identity Federation flow proceeds as follows:
 
