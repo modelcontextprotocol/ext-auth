@@ -11,7 +11,7 @@ long-lived credentials. This extension builds upon the baseline authorization
 requirements defined in the main Authorization specification.
 
 Workload Identity Federation is designed for scenarios where an MCP client
-operates as an autonomous workload - that is, the client authenticates and
+operates as an autonomous workload, that is, the client authenticates and
 authorizes as itself rather than through an interactive OAuth authorization
 flow on behalf of an end-user. In these deployments, the MCP client effectively
 functions as a workload within a workload platform (such as Kubernetes or cloud
@@ -72,16 +72,15 @@ workloads. The flow involves three primary entities:
 - **MCP Server**: The resource server that accepts access tokens issued by the
   authorization server
 
-The authorization server MUST be pre-configured with trust relationships to
-specific JWT issuers and rules determining which workload identities are
-authorized to receive access tokens.
+As a prerequisite for this flow, the authorization server MUST be configured with a set of JWT issuers (defined by a URL), which are considered 'trusted issuers'. The nature of the trusted relationship and the mechanism by which the set is populated or maintained is out of scope of this document and left up to the implementer. JWTs not issued by these trusted issuers can be safely rejected by the authorization server.
 
 ### Message Flow
 The message flow combines using a JWT as an authorization grant as defined in
 [RFC7523](https://datatracker.ietf.org/doc/html/rfc7523) with automated issuer
 discovery as described in [OpenID Connect Discovery 1.0](https://openid.net/specs/openid-connect-discovery-1_0.html)
 to obtain the [RFC7517](https://datatracker.ietf.org/doc/html/rfc7517) JWK
-Key set which is used to validate the JWT authorization grant.
+Key set which is used to validate the JWT authorization grant before the
+authorization server issues an access token.
 
 The complete Workload Identity Federation flow proceeds as follows:
 
@@ -154,12 +153,15 @@ sequenceDiagram
 
 10. **MCP Server Access**: The MCP client makes a JSON-RPC request to the MCP
    server, including the access token in the `Authorization` header using the
-   `Bearer` authentication scheme as specified in the baseline MCP Authorization
+   `Bearer` authentication scheme as specified in the baseline
+   [MCP Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization)
    specification.
 
 7. **Validate Access Token**: The MCP server validates the access token according to
-   the baseline MCP Authorization specification requirements, including
-   verifying the token was issued for the MCP server as the intended audience.
+   the baseline
+   [MCP Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization)
+   specification, including verifying the token was issued for the MCP
+   server as the intended audience.
 
 8. **MCP Server Response**: If the token is valid and the MCP client is authorized, the
    MCP server processes the request and returns the JSON-RPC response.
@@ -259,7 +261,7 @@ retrieved from a TLS protected URI.
 
 Authorization servers MUST implement mechanisms to configure:
 
-1. **Issuer Trust**: Which JWT issuers are trusted to authenticate workloads
+1. **Trust Issuers**: Which JWT issuers are trusted to authenticate workloads
 2. **Claim-Based Authorization**: Rules determining which workloads (based on
    JWT claims) are authorized to receive access tokens for specific MCP servers
 
