@@ -318,3 +318,136 @@ This specification enables the enterprise IdP to be part of the issuance of the 
 This enables the enterprise IdP to enforce policies such as which users in the organization can use certain MCP clients with certain MCP servers. Depending on the granularity of the OAuth scopes defined at the MCP server, this can also extend to govern which scopes a given user can request.
 
 For example, the enterprise policy of granting an access token through this extension may allow users in the "engineering" group to get read-only access from an AI code editor to the source control MCP server, whereas users in the "marketing" group may be able to get read and write access to the internal documentation application.
+
+#### 6.2.1 Scopes Validation
+
+In the MCP context, scopes often translate to agentic capabilities with significant impact. The IdP and MCP Authorization Server **SHOULD** treat requested scopes as a risk-weighted inventory of possible agent actions:
+
+* The IdP **SHOULD** apply stricter validation or step-up authentication for high-impact scopes (e.g., scopes enabling destructive operations, administrative functions, or access to sensitive data).
+* The IdP **SHOULD** validate that requested scopes are consistent with the user's role, the client's authorized capabilities, and enterprise policy, issuing tokens with only the intersection of these permissions (least privilege principle).
+* The MCP Authorization Server **MUST** validate that the scopes in the ID-JAG are a subset of or equal to the scopes requested in the access token request, and issue access tokens with scopes that are the intersection of the requested scopes and the scopes present in the ID-JAG.
+* Deployments **SHOULD** consider implementing scope versioning or tool snapshot tracking to detect when a scope's definition changes to include new, high-risk tools, and **SHOULD** require re-authorization in such cases.
+
+### 6.3 Transport Security and Endpoint Authentication
+
+All protocol exchanges that carry credentials, authorization codes, ID tokens, ID-JAGs, or access tokens **MUST** be protected in transit using TLS.
+
+* Implementations **MUST** use `https` URLs for authorization endpoints, token endpoints, and any metadata or key-discovery endpoints.
+* Parties **MUST** validate the peer's TLS certificate according to normal Web PKI rules.
+* Clients, the IdP, and the MCP Authorization Server **MUST NOT** transmit secrets, assertions, or tokens over insecure channels.
+* Implementations **MUST NOT** place ID-JAGs or access tokens in URLs (for example, query parameters) where they may be leaked via referrers, browser history, intermediaries, or logs.
+
+### 6.4 Assertion Security
+
+The ID-JAG is an assertion and is subject to the threats described in [RFC 7521, Section 8](https://datatracker.ietf.org/doc/html/rfc7521#section-8).
+
+#### 6.4.1 Forged Assertions
+
+To mitigate forged assertions, the MCP Authorization Server **MUST** validate the ID-JAG as a signed JWT:
+
+* The MCP Authorization Server **MUST** verify the JWS signature using a trusted key for the issuing IdP (or other designated issuer of the ID-JAG).
+* The MCP  Authorization Server **MUST** restrict accepted signature algorithms to an explicit allow-list and **MUST NOT** accept `alg: none`.
+* The MCP Authorization Server **MUST** validate JWT claims including issuer (`iss`), audience (`aud`), subject (`sub`), and time bounds (`iat`, `exp`) according to this specification.
+* The MCP Authorization Server **MUST** reject ID-JAGs with an `aud` that does not identify the intended MCP Authorization Server (or the applicable audience as defined by this profile).
+
+If the MCP Authorization Server retrieves public keys (for example, via a JWKS), it **MUST** do so over authenticated TLS and **MUST** handle key rotation safely (for example, using `kid` while preventing downgrade or rollback to untrusted keys).
+
+#### 6.4.2 Stolen Assertions and Replay
+
+An ID-JAG is a bearer artifact unless additional sender-constraining is applied. If an attacker obtains an ID-JAG, they may replay it until expiration.
+
+* ID-JAGs **MUST** be short-lived (via `exp`) and **MUST** be rejected outside their validity window (accounting for minimal clock skew).
+* The MCP Authorization Server **MUST** validate `jti` when present and **MUST** implement replay detection by rejecting re-use of the same `jti` for the lifetime of the assertion (at minimum until `exp`), scoped appropriately (for example, by `iss` and `sub`). As noted in [RFC 7523](https://datatracker.ietf.org/doc/html/rfc7523), replay protection is optional in the general JWT bearer grant framework, but it is **REQUIRED** in this profile due to the high-impact nature of MCP tool invocations.
+* Clients and servers **MUST NOT** log full ID-JAGs and **MUST** treat them as sensitive credentials.
+
+#### 6.4.3 Unauthorized Disclosure of Personal Information and Privacy
+
+Assertions can leak personal data if they include unnecessary claims or are mishandled.
+
+* The ID-JAG **SHOULD** minimize included claims to only what is required for authorization decisions.
+* Personally identifying information, such as email addresses, **SHOULD NOT** be included unless strictly necessary for a defined purpose and covered by enterprise policy and user expectations.
+* If personally identifying information is included, it **MUST** be treated as sensitive: protect it in transit, avoid logging, and apply access controls to any stored copies.
+* As noted in [RFC 7521, Section 3](https://datatracker.ietf.org/doc/html/rfc7521#section-3), an assertion **MAY** additionally be encrypted to prevent unauthorized parties (such as the client) from inspecting privacy-sensitive content. If encryption is used, the ID-JAG **MUST** be encrypted to the MCP Authorization Server.
+
+### 6.5 OAuth 2.0 Considerations 
+
+#### 6.5.1 Client Authentication and Credential Protection
+
+Where client authentication is used (for example, between the MCP Client and the MCP Server Server, and between the IdP and the MCP Authorization Server), implementations **MUST** protect client credentials:
+
+* Client secrets **MUST** be stored securely and **MUST NOT** be embedded in distributed native applications or shipped to untrusted environments.
+* Token endpoints **SHOULD** apply rate limiting and monitoring to mitigate credential-guessing and brute-force attacks.
+* Implementations **SHOULD** support credential rotation and revocation.
+* For enterprise scenarios involving high-impact MCP tool invocations, deployments **SHOULD** use strong client authentication methods such as `private_key_jwt` or Mutual TLS rather than `client_secret_basic` or `client_secret_post` to cryptographically bind the request to the client's identity and reduce the risk of credential theft.
+
+#### 6.5.2 Authorization Request CSRF Protections
+
+Where a browser-based authorization request is used during single sign-on, clients **SHOULD** use CSRF protections:
+
+* Authorization requests **SHOULD** include a `state` value and the client **MUST** validate that the returned `state` matches the one it issued before processing the response.
+* Where applicable, implementations **SHOULD** use and validate a `nonce` to bind the authentication response to the initiating session.
+
+#### 6.5.3 Authorization Code and Redirect URI Handling
+
+If the flow uses authorization codes to obtain ID tokens or other artifacts:
+
+* Authorization codes **MUST** be treated as sensitive and exchanged only over TLS.
+* Authorization servers **MUST** require exact redirect URI matching against pre-registered redirect URIs to mitigate redirection-based attacks (including open redirectors).
+* Clients **SHOULD** use PKCE where applicable, especially for public clients, to reduce authorization code interception risk.
+* Implementations **SHOULD** be aware of the security risks described with localhost redirect URIs and **SHOULD** apply additional validation for localhost-only redirect URIs, such as requiring additional attestation mechanisms or displaying clear warnings to users.
+
+#### 6.5.4 Token Handling
+
+Access tokens issued by the MCP Authorization Server are bearer tokens unless otherwise specified.
+
+* Clients **MUST** protect access tokens and ID-JAGs and **MUST NOT** leak them via logs, URLs, referrers, or to third-party origins.
+* Clients **SHOULD** store tokens and ID-JAGs securely using platform-specific secure storage mechanisms (e.g., Keychain on macOS/iOS, Credential Manager on Windows, encrypted storage on Linux).
+* MCP Servers **MUST** validate access tokens according to their token format and policy (including signature verification for JWTs, and audience restrictions where applicable).
+* MCP Servers **MAY** use token introspection (RFC 7662) to validate access tokens, especially for opaque tokens or when real-time revocation checks are required.
+* If refresh tokens are issued by an implementation, they **MUST** be treated as high-value credentials and protected accordingly (secure storage, rotation, revocation, and replay resistance as appropriate).
+* Deployments **SHOULD** implement token revocation mechanisms (RFC 7009) and **SHOULD** provide incident response procedures for revoking tokens upon suspected compromise.
+
+### 6.6 Audience and Resource Binding
+
+The ID-JAG contains both an `aud` claim (identifying the MCP Server's Authorization Server) and a `resource` claim (identifying the MCP Server itself). These two values **MUST** be treated as a bound pair to prevent cross-server token confusion attacks.
+
+**Threat Example**: An attacker who obtains an ID-JAG intended for MCP Server B could attempt to present it to MCP Server A's Authorization Server. If Server A does not validate that the `resource` claim matches its own Resource Identifier, and if scope namespaces overlap between the two servers, the attacker may gain unauthorized access to Server A.
+
+#### 6.6.1 IdP Validation of Audience-Resource Pairing
+
+The IdP **MUST** maintain a mapping of valid `(audience, resource)` pairs and **MUST** validate that the `audience` and `resource` parameters in the token exchange request represent a valid and authorized pairing according to enterprise policy.
+
+* The IdP **MUST** reject token exchange requests where the `audience` does not correspond to the authorization server for the specified `resource`. The mentioned validation prevents the IdP from issuing an ID-JAG with confused or mismatched `aud` and `resource` claims.
+
+#### 6.6.2 MCP Authorization Server Validation
+
+The MCP Authorization Server **MUST** validate both the `aud` and `resource` claims in the ID-JAG:
+
+* The MCP Authorization Server **MUST** validate that the `aud` claim matches its own Issuer URL.
+* The MCP Authorization Server **MUST** validate that the `resource` claim matches its own registered Resource Identifiers (MCP Servers).
+* If specified, the MCP Authorization Server **SHOULD** validate that the `scope` claim matches its own registered scopes for the specified `resource`
+
+If either the `aud`, `resource` or `scope` claim does not match the expected values, the MCP Authorization Server **MUST** reject the request with an `invalid_grant` error.
+
+#### 6.6.3 Additional Mitigations
+
+* Deployments **SHOULD** use globally unique and unambiguous Resource Identifiers to minimize the risk of identifier collision.
+* Scope namespaces **SHOULD** be designed to be server-specific where possible, or prefixed or namespaced to reduce cross-server collision risk.
+
+### 6.7 Token Exchange Security
+
+The use of OAuth 2.0 Token Exchange (RFC 8693) to obtain an ID-JAG introduces specific risks related to delegation and impersonation in the MCP context.
+
+* **Abuse of Delegated Rights**: Any time a principal is delegated the rights of another, the potential for abuse increases. Implementations **SHOULD** mitigate this by using the `scope` parameter to restrict the contexts in which delegated rights can be exercised.
+* **Scope-to-Tool Mapping**: In the MCP context, scopes often grant autonomous agentic capabilities. The IdP and MCP Authorization Server **SHOULD** treat requested scopes as a risk-weighted inventory of possible actions and apply stricter validation or step-up authentication for high-impact scopes.
+* **Compromised Token Leverage**: Omitting client authentication during the token exchange request allows a compromised subject token to be leveraged by any party to obtain an ID-JAG. Therefore, client authentication **MUST** be enforced.
+
+### 6.8 Privacy Considerations 
+
+In accordance with RFC 8693, Section 6, tokens employed in this profile may contain privacy-sensitive information.
+
+* **Data Minimization**: Deployments **SHOULD** determine the minimally necessary amount of data and only include such information in issued ID-JAGs or access tokens.
+* **Encryption to Recipient**: In cases where it is desirable to prevent the MCP Client from viewing privacy-sensitive claims intended for the MCP Server, the ID-JAG **MUST** be encrypted to the MCP Authorization Server.
+* **Encrypted Channels**: All tokens and assertions **MUST** only be transmitted over encrypted channels (TLS) to prevent disclosure to unintended parties.
+
+
