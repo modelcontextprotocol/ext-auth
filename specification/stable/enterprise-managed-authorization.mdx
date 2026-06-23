@@ -138,13 +138,13 @@ POST /oauth2/token HTTP/1.1
 Host: acme.idp.example
 Content-Type: application/x-www-form-urlencoded
 
-grant_type=urn:ietf:params:oauth:grant-type:token-exchange
-&requested_token_type=urn:ietf:params:oauth:token-type:id-jag
-&audience=https://auth.chat.example/
-&resource=https://mcp.chat.example/
-&scope=chat.read+chat.history
+grant_type=urn%3Aietf%3Aparams%3Aoauth%3Atoken-type%3Aid_token
+&requested_token_type=urn%3Aietf%3Aparams%3Aoauth%3Atoken-type%3Aid-jag
+&audience=https%3A%2F%2Fauth.chat.example%2F
+&resource=https%3A%2F%2Fmcp.chat.example%2F
+&scope=chat.read%2Bchat.history
 &subject_token=eyJraWQiOiJzMTZ0cVNtODhwREo4VGZCXzdrSEtQ...
-&subject_token_type=urn:ietf:params:oauth:token-type:id_token
+&subject_token_type=urn%3Aietf%3Aparams%3Aoauth%3Atoken-type%3Aid_token
 &client_id=2ec954a1d60620116d36d9ceb7
 &client_secret=a26d84873504215a34a86d52ef5cd64f4b76
 ```
@@ -163,7 +163,6 @@ If access is granted, the IdP returns the ID-JAG in a token exchange response as
 HTTP/1.1 200 OK
 Content-Type: application/json
 Cache-Control: no-store
-Pragma: no-cache
 
 {
   "issued_token_type": "urn:ietf:params:oauth:token-type:id-jag",
@@ -220,10 +219,11 @@ An example request may look like this:
 ```
 POST /oauth2/token HTTP/1.1
 Host: auth.chat.example
+Content-Type: application/x-www-form-urlencoded
 
-grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer
+grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer
 &assertion=eyJhbGciOiJIUzI1NiIsI...
-&client_id=https://client.example.com/client.json
+&client_id=https%3A%2F%2Fclient.example.com%2Fclient.json
 ```
 
 ### 5.1 Processing Rules
