@@ -39,6 +39,10 @@ This extension is particularly valuable for:
 
 This extension uses DPoP as defined in [RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449), without introducing MCP-specific claims, request body digests, or additional proof material. This design choice reflects a deliberate trade-off in favor of interoperability, deployability, and alignment with existing OAuth 2.0 security models. It does not preclude the use of the extension mechanisms defined in [RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449).
 
+### Obtaining DPoP-Bound Access Tokens
+
+MCP clients conforming to this extension MUST obtain DPoP-bound access tokens by including a DPoP proof in the `DPoP` header of the token request, as defined in [RFC 9449 Section 5](https://datatracker.ietf.org/doc/html/rfc9449#section-5). RFC 9449 is not modified by this profile: token binding and signaling (`cnf`/`jkt`, `token_type: DPoP`, [Section 6](https://datatracker.ietf.org/doc/html/rfc9449#section-6)), refresh-token binding for public clients ([Section 5](https://datatracker.ietf.org/doc/html/rfc9449#section-5)), and error handling at the token endpoint apply as specified there.
+
 ### Access Token Presentation
 
 When making requests to protected MCP server resources, clients MUST:
@@ -59,9 +63,19 @@ DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6...
 
 ```
 
+### Server-Provided Nonces
+
+Authorization servers and MCP servers MAY require a server-provided nonce in DPoP proofs, as described in [RFC 9449 Section 8](https://datatracker.ietf.org/doc/html/rfc9449#section-8) and [Section 9](https://datatracker.ietf.org/doc/html/rfc9449#section-9).
+
+When the authorization server responds with `use_dpop_nonce`, the client MUST retry the token request with a DPoP proof that includes the supplied `nonce` ([RFC 9449 Section 8](https://datatracker.ietf.org/doc/html/rfc9449#section-8)).
+
+When the MCP server responds with `use_dpop_nonce`, the client MUST retry the request with a DPoP proof that includes the supplied `nonce` ([RFC 9449 Section 9](https://datatracker.ietf.org/doc/html/rfc9449#section-9)).
+
+RFC 9449 describes the client's retry in non-normative terms ("the client is expected to retry"); this profile tightens it to MUST because a client that cannot complete the nonce flow cannot interoperate with authorization servers or MCP servers that require nonces.
+
 ### MCP Server Validation
 
-MCP servers MUST validate DPoP proofs according to [RFC 9449 Section 4.3](https://datatracker.ietf.org/doc/html/rfc9449#section-4.3). Implementations conforming to this specification MUST verify that the `iat` claim is within ±5 minutes of the server's current time.
+MCP servers MUST validate DPoP proofs according to [RFC 9449 Section 4.3](https://datatracker.ietf.org/doc/html/rfc9449#section-4.3). Implementations conforming to this specification MUST reject DPoP proofs whose `iat` claim falls outside ±5 minutes of the server's current time. Servers MAY enforce a narrower acceptance window (see {{proof-validity-window}}).
 
 If any validation step fails, the MCP server MUST reject the request with an HTTP 401 response and include appropriate error information in the `WWW-Authenticate` header as specified in [RFC 9449 Section 7.1](https://datatracker.ietf.org/doc/html/rfc9449#section-7.1).
 
@@ -71,7 +85,9 @@ If any validation step fails, the MCP server MUST reject the request with an HTT
 
 MCP servers are NOT required to track `jti` values, however, MCP servers MAY choose to implement `jti` tracking for additional security, following the guidance in [RFC 9449 Section 11.1](https://datatracker.ietf.org/doc/html/rfc9449#section-11.1).
 
-MCP servers that is not capable of keeping state or perform global `jti` tracking MUST provide DPoP proof replay protection by enforcing short `iat` acceptance windows of ±5 minutes and standard RFC 9449 claim validation. A stateless MCP server may provide additional replay protection by using a server supplied nonce as defined in [RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449) (e.g. by using an encrypted timestamp as the nonce value which can be decrypted, parsed and verified to be within an acceptable time window when returned in DPoP Proof). For example, the MCP server may create a nonce by encrypting a timestamp using an Authenticated Encryption with Associated Data (AEAD) scheme such as defined in [RFC 7518 Section 5.2](https://www.rfc-editor.org/rfc/rfc7518#section-5.2) which can be decrypted, parsed and verified to be within an acceptable time window when the MCP client returns the DPoP Proof to the MCP server).
+MCP servers that are not capable of keeping state or performing global `jti` tracking MUST rely on the `iat` acceptance window above (±5 minutes or narrower) together with standard RFC 9449 claim validation as their DPoP proof replay protection. A stateless MCP server may provide additional replay protection by using a server supplied nonce as defined in [RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449) (e.g. by using an encrypted timestamp as the nonce value which can be decrypted, parsed and verified to be within an acceptable time window when returned in DPoP Proof). For example, the MCP server may create a nonce by encrypting a timestamp using an Authenticated Encryption with Associated Data (AEAD) scheme such as defined in [RFC 7518 Section 5.2](https://www.rfc-editor.org/rfc/rfc7518#section-5.2) which can be decrypted, parsed and verified to be within an acceptable time window when the MCP client returns the DPoP Proof to the MCP server).
+
+A nonce constructed this way is valid for any client during its time window. This is consistent with [RFC 9449 Section 11.1](https://datatracker.ietf.org/doc/html/rfc9449#section-11.1), which permits the same nonce value to be used by multiple clients and accepted multiple times. Replay protection comes from each DPoP proof's key binding and freshness, not from nonce uniqueness. A server MAY nonetheless bind the nonce to a client, for example by encrypting a client identifier together with the timestamp, as additional hardening. The nonce is opaque to clients, so this choice has no interoperability impact.
 
 ## Authorization Server Metadata
 
@@ -179,9 +195,9 @@ Implementations adopting this extension MUST follow the security considerations 
 
 In addition, MCP servers MUST provide DPoP proof replay protection as described in {{stateless-replay-protection}}
 
-### Proof Validity Window
+### Proof Validity Window {#proof-validity-window}
 
-The ±5 minute validity window balances security and usability. MCP servers MAY implement stricter windows, but should be aware that overly restrictive windows may cause operational issues due to clock skew in distributed systems.
+The ±5 minute bound balances security and usability. MCP servers MAY enforce a narrower window within it, but should be aware that overly restrictive windows may cause operational issues due to clock skew in distributed systems.
 
 For high-security environments, MCP servers SHOULD implement server-provided nonces as described in [RFC 9449 Section 9](https://datatracker.ietf.org/doc/html/rfc9449#section-9) to further limit proof lifetime, even if it is stateless (see {{stateless-replay-protection}}).
 
