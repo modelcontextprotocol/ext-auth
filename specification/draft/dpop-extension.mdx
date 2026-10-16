@@ -141,6 +141,17 @@ WWW-Authenticate: DPoP algs="ES256 PS256",
   resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp"
 ```
 
+Example challenge from a server accepting both schemes and indicating the required scope:
+
+```
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer scope="files:read",
+  resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp",
+  DPoP algs="ES256 PS256"
+```
+
+This example extends the dual-challenge form of [RFC 9449 Section 7.2, Figure 17](https://datatracker.ietf.org/doc/html/rfc9449#section-7.2) with the MCP discovery parameters. The `scope` parameter ([RFC 6750 Section 3](https://datatracker.ietf.org/doc/html/rfc6750#section-3)) is used the same way under either scheme, and `resource_metadata` leads the client to the Protected Resource Metadata, which authoritatively states whether DPoP is required (`dpop_bound_access_tokens_required`) and which algorithms the server accepts. A client can determine, before its first authenticated request, whether to present a DPoP-bound token, with the challenge parameters carrying the same signals reactively. Clients supporting this extension use the `DPoP` challenge. Clients that do not support it continue with the `Bearer` challenge unchanged.
+
 ## Examples
 
 ### Complete DPoP Proof Example
