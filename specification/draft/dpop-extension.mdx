@@ -20,6 +20,7 @@ This extension is based on the following established specifications:
 
 - OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer (DPoP) ([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449))
 - OAuth 2.0 Authorization Server Metadata ([RFC8414](https://datatracker.ietf.org/doc/html/rfc8414))
+- OAuth 2.0 Protected Resource Metadata ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728))
 - JSON Web Algorithms (JWA) [RFC 7518 Section 5.2](https://www.rfc-editor.org/rfc/rfc7518)
 
 ## DPoP for MCP Resource Access
@@ -65,6 +66,12 @@ MCP servers MUST validate DPoP proofs according to [RFC 9449 Section 4.3](https:
 
 If any validation step fails, the MCP server MUST reject the request with an HTTP 401 response and include appropriate error information in the `WWW-Authenticate` header as specified in [RFC 9449 Section 7.1](https://datatracker.ietf.org/doc/html/rfc9449#section-7.1).
 
+When rejecting a request, the MCP server SHOULD use the `invalid_dpop_proof` error code for any failure of the [RFC 9449 Section 4.3](https://datatracker.ietf.org/doc/html/rfc9449#section-4.3) validation steps, including a malformed or duplicated `DPoP` header, and the `invalid_token` error code for failures of the access token itself ([RFC 6750 Section 3.1](https://datatracker.ietf.org/doc/html/rfc6750#section-3.1)).
+
+### Bearer Scheme Downgrade Protection
+
+A DPoP-bound access token is sender-constrained and MUST NOT be usable as a bearer token. MCP servers MUST NOT accept a DPoP-bound access token presented using the `Bearer` authentication scheme (see [RFC 9449 Section 7.2](https://datatracker.ietf.org/doc/html/rfc9449#section-7.2)). The MCP server MUST reject such a request with an HTTP 401 response that includes a `WWW-Authenticate` challenge using the `Bearer` ([RFC 6750 Section 3](https://datatracker.ietf.org/doc/html/rfc6750#section-3)) or `DPoP` ([RFC 9449 Section 7.1](https://datatracker.ietf.org/doc/html/rfc9449#section-7.1)) scheme, and SHOULD indicate the `invalid_token` error code ([RFC 6750 Section 3.1](https://datatracker.ietf.org/doc/html/rfc6750#section-3.1)).
+
 ### Stateless Operation and DPoP Proof Replay Protection {#stateless-replay-protection}
 
 [RFC 9449 Section 11.1](https://www.rfc-editor.org/rfc/rfc9449.html#name-dpop-proof-replay) provides specific guidance on replay protection mechanisms that adress the risks of a DPoP Proofs being replayed.
@@ -86,7 +93,7 @@ Example Authorization Server Metadata:
   "issuer": "https://auth.example.com",
   "authorization_endpoint": "https://auth.example.com/authorize",
   "token_endpoint": "https://auth.example.com/token",
-  "dpop_signing_alg_values_supported": ["ES256", "RS256", "PS256"]
+  "dpop_signing_alg_values_supported": ["ES256", "PS256"]
 }
 
 ```
@@ -98,6 +105,52 @@ Example Authorization Server Metadata:
 Clients that exclusively use DPoP MAY indicate this through the `dpop_bound_access_tokens` client registration metadata field as defined in [RFC 9449 Section 5.2](https://datatracker.ietf.org/doc/html/rfc9449#section-5.2).
 
 When this field is set to `true`, the authorization server MUST reject token requests from the client that do not include a valid DPoP proof.
+
+## MCP Server DPoP Advertisement
+
+MCP clients need a way to learn that an MCP server supports or requires DPoP before presenting credentials. This section defines how MCP servers supporting this extension advertise that capability. The baseline MCP authorization discovery mechanisms (Protected Resource Metadata discovery via the `WWW-Authenticate` header or well-known URIs) are unchanged.
+
+### Protected Resource Metadata
+
+MCP servers supporting this extension MUST include the `dpop_signing_alg_values_supported` field in their Protected Resource Metadata ([RFC 9728 Section 2](https://datatracker.ietf.org/doc/html/rfc9728#section-2)). This field MUST contain a non-empty JSON array of registered JWS algorithm values (from the IANA JSON Web Signature and Encryption Algorithms registry) that the server accepts for DPoP proof JWTs. Only asymmetric digital signature algorithms are permitted. The `none` algorithm and symmetric (MAC) algorithms MUST NOT be included.
+
+An MCP server that requires DPoP-bound access tokens (that is, one that does not accept bearer tokens) MUST set the `dpop_bound_access_tokens_required` field to `true` in its Protected Resource Metadata. Conversely, an MCP server that sets `dpop_bound_access_tokens_required` to `true` MUST reject requests that do not present a DPoP-bound access token with a valid DPoP proof. When the field is absent, the default behavior defined in [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) applies and DPoP-bound access tokens are not required.
+
+Example Protected Resource Metadata for a server that requires DPoP:
+
+```json
+{
+  "resource": "https://mcp.example.com/mcp",
+  "authorization_servers": ["https://auth.example.com"],
+  "dpop_signing_alg_values_supported": ["ES256", "PS256"],
+  "dpop_bound_access_tokens_required": true
+}
+```
+
+### WWW-Authenticate Challenge
+
+When responding to an unauthenticated or failed request with HTTP 401, an MCP server supporting this extension SHOULD include a `DPoP` challenge in the `WWW-Authenticate` header, and that challenge SHOULD include the `algs` parameter signaling the JWS algorithms acceptable for DPoP proof JWTs, as described in [RFC 9449 Section 7.1](https://datatracker.ietf.org/doc/html/rfc9449#section-7.1). The `DPoP` challenge MAY appear alongside other challenges, such as a `Bearer` challenge carrying the `resource_metadata` parameter defined in [RFC 9728 Section 5.1](https://datatracker.ietf.org/doc/html/rfc9728#section-5.1).
+
+An MCP server that sets `dpop_bound_access_tokens_required` to `true` in its Protected Resource Metadata MUST include a `DPoP` challenge in every `WWW-Authenticate` response it sends. Other challenges MAY appear alongside it, for example a `Bearer` challenge used to deliver error information to a client that attempted bearer authentication, as described in [RFC 9449 Section 7.2](https://datatracker.ietf.org/doc/html/rfc9449#section-7.2).
+
+Example challenge:
+
+```
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: DPoP algs="ES256 PS256",
+  resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp"
+```
+
+Example challenge from a server accepting both schemes and indicating the required scope:
+
+```
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer scope="files:read",
+  resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp",
+  DPoP algs="ES256 PS256"
+```
+
+This example extends the dual-challenge form of [RFC 9449 Section 7.2, Figure 17](https://datatracker.ietf.org/doc/html/rfc9449#section-7.2) with the MCP discovery parameters. The `scope` parameter ([RFC 6750 Section 3](https://datatracker.ietf.org/doc/html/rfc6750#section-3)) is used the same way under either scheme, and `resource_metadata` leads the client to the Protected Resource Metadata, which authoritatively states whether DPoP is required (`dpop_bound_access_tokens_required`) and which algorithms the server accepts. A client can determine, before its first authenticated request, whether to present a DPoP-bound token, with the challenge parameters carrying the same signals reactively. Clients supporting this extension use the `DPoP` challenge. Clients that do not support it continue with the `Bearer` challenge unchanged.
 
 ## Examples
 
