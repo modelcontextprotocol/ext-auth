@@ -60,6 +60,10 @@ DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6...
 
 ```
 
+### Authorization Code Binding
+
+MCP clients using the authorization code grant SHOULD bind the authorization code to their DPoP key, as described in [RFC 9449 Section 10](https://datatracker.ietf.org/doc/html/rfc9449#section-10).
+
 ### MCP Server Validation
 
 MCP servers MUST validate DPoP proofs according to [RFC 9449 Section 4.3](https://datatracker.ietf.org/doc/html/rfc9449#section-4.3). Implementations conforming to this specification MUST verify that the `iat` claim is within ±5 minutes of the server's current time.
