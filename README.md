@@ -7,9 +7,11 @@ These extensions are:
 - **Optional** - Implementations can choose to adopt these extensions
 - **Additive** - Extensions do not modify or break core protocol functionality; they add new capabilities while preserving core protocol behavior
 - **Composable** - Extensions are modular and designed to work together without conflicts, allowing implementations to adopt multiple extensions simultaneously
-- **Versioned independently** - Extensions follow the core MCP versioning cycle but may adopt independent versioning as needed
+- **Versioned with the core protocol** - A Stable extension is published as revisions keyed to core protocol revisions, and proposed changes collect in its `draft/` directory
 
 ## Extensions
+
+The directory that holds an extension's specification shows its stage: `specification/experimental/`, `specification/beta/` or `specification/stable/`. [SEP-3392](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/3392) defines the stages.
 
 ### Stable
 
@@ -18,7 +20,7 @@ These extensions are:
 
 ## Governance
 
-This repository follows the [Model Context Protocol Governance](https://modelcontextprotocol.io/community/governance) process, with a dedicated set of maintainers for authorization extensions. See [MAINTAINERS.md](./MAINTAINERS.md) for the list of maintainers specific to this repository.
+This repository follows the [Model Context Protocol Governance](https://modelcontextprotocol.io/community/governance) process, with a dedicated set of Extension Maintainers for authorization extensions, listed in [MAINTAINERS.md](./MAINTAINERS.md). The extensions are associated with the [Authorization Interest Group](https://modelcontextprotocol.io/community/interest-groups/auth).
 
 All decisions regarding authorization extensions follow the same governance model as the core specification, including:
 
