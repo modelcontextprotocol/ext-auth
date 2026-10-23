@@ -23,6 +23,7 @@ The directory that holds an extension's specification shows its stage: `specific
 Experimental extensions may change or be withdrawn at any time, without notice.
 
 - [DPoP Profile for MCP](./specification/experimental/dpop.mdx)
+- [Workload Identity Federation](./specification/experimental/workload-identity-federation.mdx)
 
 ## Governance
 
