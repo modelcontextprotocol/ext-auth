@@ -1,0 +1,280 @@
+# DPoP Profile for MCP
+
+## Introduction
+
+### Purpose and Scope
+
+This extension specifies OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer (DPoP) ([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449)) as an optional extension for the Model Context Protocol (MCP) to support sender-constrained access tokens. DPoP binds OAuth 2.0 access tokens to cryptographic key pairs controlled by MCP clients, requiring clients to demonstrate possession of the corresponding private key with each request. This prevents unauthorized use of tokens even if they are intercepted or leaked.
+
+### Extension Requirements
+
+This extension is OPTIONAL for MCP implementations. When supported:
+
+- Implementations MUST conform to all requirements specified in this extension
+- Implementations MUST also conform to the baseline authorization requirements
+- This extension is specifically designed for HTTP-based transports
+
+### Standards Compliance
+
+This extension is based on the following established specifications:
+
+- OAuth 2.0 Demonstrating Proof-of-Possession at the Application Layer (DPoP) ([RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449))
+- OAuth 2.0 Authorization Server Metadata ([RFC8414](https://datatracker.ietf.org/doc/html/rfc8414))
+- OAuth 2.0 Protected Resource Metadata ([RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728))
+- JSON Web Algorithms (JWA) [RFC 7518 Section 5.2](https://www.rfc-editor.org/rfc/rfc7518)
+
+## DPoP for MCP Resource Access
+
+### Overview
+
+MCP’s current authorization model uses bearer tokens, which can be reused by an unauthorized party if the token is leaked, intercepted or exfiltrated. If an access token is intercepted, through network eavesdropping, compromised logs, or other means, an attacker use the token from a MCP client under its control to access protected MCP resources until the token expires.
+
+DPoP addresses this by making tokens "sender-constrained" so that even if an attacker obtains an access token, they cannot use it without also possessing or controlling the correspondiong client's private key. This significantly raises the bar for attackers. In the MCP context, MCP clients prove possession of a private key when making JSON-RPC requests to MCP servers. This proof is verified by the MCP server before granting access to protected resources.
+
+This extension is particularly valuable for:
+
+- High-security environments handling sensitive data.
+- Long-lived access tokens.
+- Deployments where token theft risk is elevated.
+- Compliance requirements mandating proof of possession or sender constrained tokens.
+
+This extension uses DPoP as defined in [RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449), without introducing MCP-specific claims, request body digests, or additional proof material. This design choice reflects a deliberate trade-off in favor of interoperability, deployability, and alignment with existing OAuth 2.0 security models. It does not preclude the use of the extension mechanisms defined in [RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449).
+
+### Obtaining DPoP-Bound Access Tokens
+
+MCP clients conforming to this extension MUST obtain DPoP-bound access tokens by including a DPoP proof in the `DPoP` header of the token request, as defined in [RFC 9449 Section 5](https://datatracker.ietf.org/doc/html/rfc9449#section-5). RFC 9449 is not modified by this profile: token binding and signaling (`cnf`/`jkt`, `token_type: DPoP`, [Section 6](https://datatracker.ietf.org/doc/html/rfc9449#section-6)), refresh-token binding for public clients ([Section 5](https://datatracker.ietf.org/doc/html/rfc9449#section-5)), and error handling at the token endpoint apply as specified there.
+
+### Access Token Presentation
+
+When making requests to protected MCP server resources, clients MUST:
+
+1. Include the access token using the `Authorization` header with the `DPoP` authentication scheme as specified in [RFC 9449 Section 7.1](https://datatracker.ietf.org/doc/html/rfc9449#section-7.1)
+2. Include a fresh DPoP proof in the `DPoP` header
+
+Example request:
+
+```
+POST /mcp HTTP/1.1
+Host: mcp.example.com
+Content-Type: application/json
+Authorization: DPoP eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9...
+DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6...
+
+{"jsonrpc":"2.0","method":"tools/list","id":1}
+
+```
+
+### Authorization Code Binding
+
+MCP clients using the authorization code grant SHOULD bind the authorization code to their DPoP key, as described in [RFC 9449 Section 10](https://datatracker.ietf.org/doc/html/rfc9449#section-10).
+
+### Server-Provided Nonces
+
+Authorization servers and MCP servers MAY require a server-provided nonce in DPoP proofs, as described in [RFC 9449 Section 8](https://datatracker.ietf.org/doc/html/rfc9449#section-8) and [Section 9](https://datatracker.ietf.org/doc/html/rfc9449#section-9).
+
+When the authorization server responds with `use_dpop_nonce`, the client MUST retry the token request with a DPoP proof that includes the supplied `nonce` ([RFC 9449 Section 8](https://datatracker.ietf.org/doc/html/rfc9449#section-8)).
+
+When the MCP server responds with `use_dpop_nonce`, the client MUST retry the request with a DPoP proof that includes the supplied `nonce` ([RFC 9449 Section 9](https://datatracker.ietf.org/doc/html/rfc9449#section-9)).
+
+RFC 9449 describes the client's retry in non-normative terms ("the client is expected to retry"); this profile tightens it to MUST because a client that cannot complete the nonce flow cannot interoperate with authorization servers or MCP servers that require nonces.
+
+### MCP Server Validation
+
+MCP servers MUST validate DPoP proofs according to [RFC 9449 Section 4.3](https://datatracker.ietf.org/doc/html/rfc9449#section-4.3). Implementations conforming to this specification MUST reject DPoP proofs whose `iat` claim falls outside ±5 minutes of the server's current time. Servers MAY enforce a narrower acceptance window (see {{proof-validity-window}}).
+
+If any validation step fails, the MCP server MUST reject the request with an HTTP 401 response and include appropriate error information in the `WWW-Authenticate` header as specified in [RFC 9449 Section 7.1](https://datatracker.ietf.org/doc/html/rfc9449#section-7.1).
+
+When rejecting a request, the MCP server SHOULD use the `invalid_dpop_proof` error code for any failure of the [RFC 9449 Section 4.3](https://datatracker.ietf.org/doc/html/rfc9449#section-4.3) validation steps, including a malformed or duplicated `DPoP` header, and the `invalid_token` error code for failures of the access token itself ([RFC 6750 Section 3.1](https://datatracker.ietf.org/doc/html/rfc6750#section-3.1)).
+
+### Bearer Scheme Downgrade Protection
+
+A DPoP-bound access token is sender-constrained and MUST NOT be usable as a bearer token. MCP servers MUST NOT accept a DPoP-bound access token presented using the `Bearer` authentication scheme (see [RFC 9449 Section 7.2](https://datatracker.ietf.org/doc/html/rfc9449#section-7.2)). The MCP server MUST reject such a request with an HTTP 401 response that includes a `WWW-Authenticate` challenge using the `Bearer` ([RFC 6750 Section 3](https://datatracker.ietf.org/doc/html/rfc6750#section-3)) or `DPoP` ([RFC 9449 Section 7.1](https://datatracker.ietf.org/doc/html/rfc9449#section-7.1)) scheme, and SHOULD indicate the `invalid_token` error code ([RFC 6750 Section 3.1](https://datatracker.ietf.org/doc/html/rfc6750#section-3.1)).
+
+### Stateless Operation and DPoP Proof Replay Protection {#stateless-replay-protection}
+
+[RFC 9449 Section 11.1](https://www.rfc-editor.org/rfc/rfc9449.html#name-dpop-proof-replay) provides specific guidance on replay protection mechanisms that adress the risks of a DPoP Proofs being replayed.
+
+MCP servers are NOT required to track `jti` values, however, MCP servers MAY choose to implement `jti` tracking for additional security, following the guidance in [RFC 9449 Section 11.1](https://datatracker.ietf.org/doc/html/rfc9449#section-11.1).
+
+MCP servers that are not capable of keeping state or performing global `jti` tracking MUST rely on the `iat` acceptance window above (±5 minutes or narrower) together with standard RFC 9449 claim validation as their DPoP proof replay protection. A stateless MCP server may provide additional replay protection by using a server supplied nonce as defined in [RFC 9449](https://datatracker.ietf.org/doc/html/rfc9449) (e.g. by using an encrypted timestamp as the nonce value which can be decrypted, parsed and verified to be within an acceptable time window when returned in DPoP Proof). For example, the MCP server may create a nonce by encrypting a timestamp using an Authenticated Encryption with Associated Data (AEAD) scheme such as defined in [RFC 7518 Section 5.2](https://www.rfc-editor.org/rfc/rfc7518#section-5.2) which can be decrypted, parsed and verified to be within an acceptable time window when the MCP client returns the DPoP Proof to the MCP server).
+
+A nonce constructed this way is valid for any client during its time window. This is consistent with [RFC 9449 Section 11.1](https://datatracker.ietf.org/doc/html/rfc9449#section-11.1), which permits the same nonce value to be used by multiple clients and accepted multiple times. Replay protection comes from each DPoP proof's key binding and freshness, not from nonce uniqueness. A server MAY nonetheless bind the nonce to a client, for example by encrypting a client identifier together with the timestamp, as additional hardening. The nonce is opaque to clients, so this choice has no interoperability impact.
+
+## Authorization Server Metadata
+
+Authorization servers supporting DPoP MUST include the `dpop_signing_alg_values_supported` field in their Authorization Server Metadata as defined in [RFC 9449 Section 5.1](https://datatracker.ietf.org/doc/html/rfc9449#section-5.1).
+
+This field MUST contain a JSON array listing the JWS algorithm values supported for DPoP proof JWTs. Only asymmetric signature algorithms are permitted; the `none` algorithm MUST NOT be included.
+
+Example Authorization Server Metadata:
+
+```json
+{
+  "issuer": "https://auth.example.com",
+  "authorization_endpoint": "https://auth.example.com/authorize",
+  "token_endpoint": "https://auth.example.com/token",
+  "dpop_signing_alg_values_supported": ["ES256", "PS256"]
+}
+```
+
+**Note on Algorithm Selection:** While this specification does not mandate specific algorithms, authorization servers and clients SHOULD support modern, secure algorithms such as ES256 (ECDSA using P-256 and SHA-256). Implementations should avoid deprecated or weak algorithms. The security considerations of chosen algorithms are beyond the scope of this specification; implementers should consult current cryptographic best practices.
+
+## Client Registration Metadata
+
+Clients that exclusively use DPoP MAY indicate this through the `dpop_bound_access_tokens` client registration metadata field as defined in [RFC 9449 Section 5.2](https://datatracker.ietf.org/doc/html/rfc9449#section-5.2).
+
+When this field is set to `true`, the authorization server MUST reject token requests from the client that do not include a valid DPoP proof.
+
+## MCP Server DPoP Advertisement
+
+MCP clients need a way to learn that an MCP server supports or requires DPoP before presenting credentials. This section defines how MCP servers supporting this extension advertise that capability. The baseline MCP authorization discovery mechanisms (Protected Resource Metadata discovery via the `WWW-Authenticate` header or well-known URIs) are unchanged.
+
+### Protected Resource Metadata
+
+MCP servers supporting this extension MUST include the `dpop_signing_alg_values_supported` field in their Protected Resource Metadata ([RFC 9728 Section 2](https://datatracker.ietf.org/doc/html/rfc9728#section-2)). This field MUST contain a non-empty JSON array of registered JWS algorithm values (from the IANA JSON Web Signature and Encryption Algorithms registry) that the server accepts for DPoP proof JWTs. Only asymmetric digital signature algorithms are permitted. The `none` algorithm and symmetric (MAC) algorithms MUST NOT be included.
+
+An MCP server that requires DPoP-bound access tokens (that is, one that does not accept bearer tokens) MUST set the `dpop_bound_access_tokens_required` field to `true` in its Protected Resource Metadata. Conversely, an MCP server that sets `dpop_bound_access_tokens_required` to `true` MUST reject requests that do not present a DPoP-bound access token with a valid DPoP proof. When the field is absent, the default behavior defined in [RFC 9728](https://datatracker.ietf.org/doc/html/rfc9728) applies and DPoP-bound access tokens are not required.
+
+Example Protected Resource Metadata for a server that requires DPoP:
+
+```json
+{
+  "resource": "https://mcp.example.com/mcp",
+  "authorization_servers": ["https://auth.example.com"],
+  "dpop_signing_alg_values_supported": ["ES256", "PS256"],
+  "dpop_bound_access_tokens_required": true
+}
+```
+
+### WWW-Authenticate Challenge
+
+When responding to an unauthenticated or failed request with HTTP 401, an MCP server supporting this extension SHOULD include a `DPoP` challenge in the `WWW-Authenticate` header, and that challenge SHOULD include the `algs` parameter signaling the JWS algorithms acceptable for DPoP proof JWTs, as described in [RFC 9449 Section 7.1](https://datatracker.ietf.org/doc/html/rfc9449#section-7.1). The `DPoP` challenge MAY appear alongside other challenges, such as a `Bearer` challenge carrying the `resource_metadata` parameter defined in [RFC 9728 Section 5.1](https://datatracker.ietf.org/doc/html/rfc9728#section-5.1).
+
+An MCP server that sets `dpop_bound_access_tokens_required` to `true` in its Protected Resource Metadata MUST include a `DPoP` challenge in every `WWW-Authenticate` response it sends. Other challenges MAY appear alongside it, for example a `Bearer` challenge used to deliver error information to a client that attempted bearer authentication, as described in [RFC 9449 Section 7.2](https://datatracker.ietf.org/doc/html/rfc9449#section-7.2).
+
+Example challenge:
+
+```
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: DPoP algs="ES256 PS256",
+  resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp"
+```
+
+Example challenge from a server accepting both schemes and indicating the required scope:
+
+```
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer scope="files:read",
+  resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp",
+  DPoP algs="ES256 PS256"
+```
+
+This example extends the dual-challenge form of [RFC 9449 Section 7.2, Figure 17](https://datatracker.ietf.org/doc/html/rfc9449#section-7.2) with the MCP discovery parameters. The `scope` parameter ([RFC 6750 Section 3](https://datatracker.ietf.org/doc/html/rfc6750#section-3)) is used the same way under either scheme, and `resource_metadata` leads the client to the Protected Resource Metadata, which authoritatively states whether DPoP is required (`dpop_bound_access_tokens_required`) and which algorithms the server accepts. A client can determine, before its first authenticated request, whether to present a DPoP-bound token, with the challenge parameters carrying the same signals reactively. Clients supporting this extension use the `DPoP` challenge. Clients that do not support it continue with the `Bearer` challenge unchanged.
+
+## Examples
+
+### Complete DPoP Proof Example
+
+Below is an example of a decoded DPoP proof JWT suitable for an MCP request:
+
+**JWT Header:**
+
+```json
+{
+  "typ": "dpop+jwt",
+  "alg": "ES256",
+  "jwk": {
+    "kty": "EC",
+    "x": "l8tFrhx-34tV3hRICRDY9zCkDlpBhF42UQUfWVAWBFs",
+    "y": "9VE4jf_Ok_o64zbTTlcuNJajHmt6v9TDVrU0CdvGRDA",
+    "crv": "P-256"
+  }
+}
+```
+
+**JWT Payload:**
+
+```json
+{
+  "jti": "e1j3V_bKic8-LAEB",
+  "htm": "POST",
+  "htu": "https://mcp.example.com/mcp",
+  "iat": 1699564218,
+  "ath": "fUHyO2r2Z3DZ53EsNrWBb0xWXoaNy59IiKCAqksmQEo"
+}
+```
+
+### Complete Request Example
+
+```
+POST /mcp HTTP/1.1
+Host: mcp.example.com
+Content-Type: application/json
+Content-Length: 52
+Authorization: DPoP eyJhbGciOiJFUzI1NiIsImtpZCI6IkJlQUxrYiJ9.eyJzdWIiOiJzb21lb25lQGV4YW1wbGUuY29tIiwiaXNzIjoiaHR0cHM6Ly9hdXRoLmV4YW1wbGUuY29tIiwiYXVkIjoiaHR0cHM6Ly9tY3AuZXhhbXBsZS5jb20iLCJuYmYiOjE2OTk1NjQyMTEsImV4cCI6MTY5OTU2NzgxMSwiY25mIjp7ImprdCI6IjBaY09DT1JaTll5LURXcHFxMzBqWnlKR0hUTjBkMkhnbEJWM3VpZ3VBNEkifX0.fT0eG8Qa0nKW8P0qT6YZqVhBnb2r5Q0yX7VqA8Zr1Yk
+DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6IkVDIiwieCI6Imw4dEZyaHgtMzR0VjNoUklDUkRZOXpDa0RscEJoRjQyVVFVZldWQVdCRnMiLCJ5IjoiOVZFNGpmX09rX282NHpiVFRsY3VOSmFqSG10NnY5REFLVXJVMENZR1JEQSIsImNydiI6IlAtMjU2In19LnsianlpIjoiZTFqM1ZfYktpYzgtTEFFQiIsImh0bSI6IlBPU1QiLCJodHUiOiJodHRwczovL21jcC5leGFtcGxlLmNvbS9tY3AiLCJpYXQiOjE2OTk1NjQyMTgsImF0aCI6ImZVSHlPMnIyWjNEWjUzRXNOcldCYjB4V1hvYU55NTlJaUtDQXFrc21RRW8ifQ==.mHN0qXKq_EXAMPLE_SIGNATURE_DATA_HERE
+
+{"jsonrpc":"2.0","method":"tools/list","id":1}
+
+```
+
+### Error Response Example
+
+When validation fails, the MCP server returns an error response:
+
+```
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: DPoP error="invalid_dpop_proof",
+  error_description="Content digest mismatch"
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "error": {
+    "code": -32001,
+    "message": "Unauthorized"
+  },
+  "id": 1
+}
+
+```
+
+## Security Considerations
+
+Implementations adopting this extension MUST follow the security considerations outlined in:
+
+- [RFC 9449 Section 11 "Security Considerations"](https://datatracker.ietf.org/doc/html/rfc9449#section-11)
+- The baseline MCP Authorization specification security requirements
+- OAuth 2.1 security best practices
+
+In addition, MCP servers MUST provide DPoP proof replay protection as described in {{stateless-replay-protection}}
+
+### Proof Validity Window {#proof-validity-window}
+
+The ±5 minute bound balances security and usability. MCP servers MAY enforce a narrower window within it, but should be aware that overly restrictive windows may cause operational issues due to clock skew in distributed systems.
+
+For high-security environments, MCP servers SHOULD implement server-provided nonces as described in [RFC 9449 Section 9](https://datatracker.ietf.org/doc/html/rfc9449#section-9) to further limit proof lifetime, even if it is stateless (see {{stateless-replay-protection}}).
+
+### Key Storage
+
+Clients MUST protect DPoP private keys using appropriate security measures. If hardware security modules or secure enclaves are available, they SHOULD be used to protect private keys to prevent key extraction. If keys can be extracted and exfiltrated, an attacker who compromises the client can generate valid DPoP proofs.
+
+Browser-based clients SHOULD use the Web Crypto API with non-extractable keys to prevent key exfiltration via XSS attacks.
+
+### Algorithm Security
+
+Only asymmetric signature algorithms MUST be used for DPoP proofs. Symmetric algorithms and the `none` algorithm MUST NOT be permitted as specified in [RFC 9449 Section 11.6](https://datatracker.ietf.org/doc/html/rfc9449#section-11.6).
+
+**Open Question:** This specification does not mandate a minimum algorithm strength floor (e.g., requiring ES256 or better). Implementers should carefully evaluate which algorithms to support based on current cryptographic best practices and their security requirements. A future revision of this specification may provide more specific algorithm recommendations.
+
+### Replay Detection Without State
+
+Replay protection options for stateless MCP servers are described in {{stateless-replay-protection}}. MCP servers requiring maximum replay protection SHOULD implement `jti` tracking despite the operational complexity. The trade-offs are discussed in detail in [RFC 9449 Section 11.1](https://datatracker.ietf.org/doc/html/rfc9449#section-11.1).
+
+### DPoP Limitations
+
+DPoP does not prevent token theft, but provides a mechanism that allows detection of replay attacks that utilise a stolen token. In addition, DPoP does not address confused deputy vulnerabilities or other authorization-level attacks. Consequently. implementations must maintain defense in depth by implementing all required security controls.
+
+### Integration with MCP Security Model
+
+This extension complements but does not replace the token audience validation requirements specified in the baseline MCP Authorization specification. MCP servers MUST continue to validate that access tokens were specifically issued for them, even when DPoP is used.
