@@ -6,6 +6,13 @@ This extension lets an MCP client that runs as a workload, acting as itself rath
 
 It is a profile of the [Workload Authorization Grant](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html) (WAG). Anything not stated here is as defined in WAG and in the [MCP Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization) specification. Section numbers refer to the linked editor's copy of WAG.
 
+<Note>
+  **TODO**: add a second assertion profile for tokens a workload platform
+  already issues, such as Kubernetes service account tokens and SPIFFE
+  JWT-SVIDs, alongside WAG. The authorization server would choose the profile
+  per trusted issuer.
+</Note>
+
 ## Roles
 
 - **MCP Client**: the Agent in WAG.
