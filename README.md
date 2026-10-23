@@ -13,7 +13,7 @@ These extensions are:
 
 ### Stable
 
-- [Enterprise-Managed Authorization](https://github.com/modelcontextprotocol/ext-auth/blob/main/specification/stable/enterprise-managed-authorization.mdx)
+- [Enterprise-Managed Authorization](./specification/stable/enterprise-managed-authorization/2026-07-28/enterprise-managed-authorization.mdx) ([draft](./specification/stable/enterprise-managed-authorization/draft/enterprise-managed-authorization.mdx))
 
 ### Draft
 
