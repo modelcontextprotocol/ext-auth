@@ -115,7 +115,6 @@ Example Authorization Server Metadata:
   "token_endpoint": "https://auth.example.com/token",
   "dpop_signing_alg_values_supported": ["ES256", "PS256"]
 }
-
 ```
 
 **Note on Algorithm Selection:** While this specification does not mandate specific algorithms, authorization servers and clients SHOULD support modern, secure algorithms such as ES256 (ECDSA using P-256 and SHA-256). Implementations should avoid deprecated or weak algorithms. The security considerations of chosen algorithms are beyond the scope of this specification; implementers should consult current cryptographic best practices.
@@ -191,7 +190,6 @@ Below is an example of a decoded DPoP proof JWT suitable for an MCP request:
     "crv": "P-256"
   }
 }
-
 ```
 
 **JWT Payload:**
@@ -202,9 +200,8 @@ Below is an example of a decoded DPoP proof JWT suitable for an MCP request:
   "htm": "POST",
   "htu": "https://mcp.example.com/mcp",
   "iat": 1699564218,
-  "ath": "fUHyO2r2Z3DZ53EsNrWBb0xWXoaNy59IiKCAqksmQEo",
+  "ath": "fUHyO2r2Z3DZ53EsNrWBb0xWXoaNy59IiKCAqksmQEo"
 }
-
 ```
 
 ### Complete Request Example
@@ -275,6 +272,7 @@ Only asymmetric signature algorithms MUST be used for DPoP proofs. Symmetric alg
 Replay protection options for stateless MCP servers are described in {{stateless-replay-protection}}. MCP servers requiring maximum replay protection SHOULD implement `jti` tracking despite the operational complexity. The trade-offs are discussed in detail in [RFC 9449 Section 11.1](https://datatracker.ietf.org/doc/html/rfc9449#section-11.1).
 
 ### DPoP Limitations
+
 DPoP does not prevent token theft, but provides a mechanism that allows detection of replay attacks that utilise a stolen token. In addition, DPoP does not address confused deputy vulnerabilities or other authorization-level attacks. Consequently. implementations must maintain defense in depth by implementing all required security controls.
 
 ### Integration with MCP Security Model
