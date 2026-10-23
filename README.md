@@ -14,10 +14,7 @@ These extensions are:
 ### Stable
 
 - [Enterprise-Managed Authorization](./specification/stable/enterprise-managed-authorization/2026-07-28/enterprise-managed-authorization.mdx) ([draft](./specification/stable/enterprise-managed-authorization/draft/enterprise-managed-authorization.mdx))
-
-### Draft
-
-- [Client Credentials](https://github.com/modelcontextprotocol/ext-auth/blob/main/specification/draft/oauth-client-credentials.mdx)
+- [OAuth Client Credentials](./specification/stable/oauth-client-credentials/2026-07-28/oauth-client-credentials.mdx) ([draft](./specification/stable/oauth-client-credentials/draft/oauth-client-credentials.mdx))
 
 ## Governance
 
