@@ -2,78 +2,18 @@
 
 ## Introduction
 
-### Purpose and Scope
+This extension lets an MCP client that runs as a workload, acting as itself rather than on behalf of a user, obtain an access token for an MCP server without client registration, a `client_id` or a long-lived credential.
 
-This extension defines Workload Identity Federation for the Model Context
-Protocol, enabling autonomous MCP clients to access MCP servers using existing
-workload identity credentials without requiring separate client registration or
-long-lived credentials. This extension builds upon the baseline authorization
-requirements defined in the main Authorization specification.
+It is a profile of the [Workload Authorization Grant](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html) (WAG). Anything not stated here is as defined in WAG and in the [MCP Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization) specification. Section numbers refer to the linked editor's copy of WAG.
 
-Workload Identity Federation is designed for scenarios where an MCP client
-operates as an autonomous workload, that is, the client authenticates and
-authorizes as itself rather than through an interactive OAuth authorization
-flow on behalf of an end-user. In these deployments, the MCP client effectively
-functions as a workload within a workload platform (such as Kubernetes or cloud
-provider environments). Like the Client Credentials extension, this pattern
-addresses machine-to-machine authentication use cases.
+## Roles
 
-This extension allows an MCP client that already possesses a JWT credential
-(issued by its workload platform, SPIFFE infrastructure, or other trusted
-identity provider) to present that credential directly to an authorization
-server protecting an MCP server. The authorization server validates the JWT and
-issues a temporary access token suitable for accessing the MCP server.
-
-This approach eliminates the need for:
-
-- Client credentials (client secrets or private keys)
-- Client identifiers (client_id)
-- Client registration (including Dynamic Client Registration)
-- Managing separate credentials for each service the client needs to access
-
-Instead, MCP clients leverage their existing platform-provided workload identity
-and "federate" to other services through trust relationships configured in the
-authorization server. This significantly simplifies workload-to-service
-access patterns while maintaining security through proper issuer trust
-and claim-based authorization.
-
-### Extension Requirements
-
-This extension is OPTIONAL for MCP implementations. When adopted:
-
-- Implementations MUST conform to all requirements specified in this extension
-- Implementations MUST also conform to the baseline authorization requirements
-- This extension is specifically designed for HTTP-based transports
-- This extension is designed for autonomous MCP clients operating as workloads
-
-### Standards Compliance
-
-This extension is based on the following established specifications:
-
-- JSON Web Token (JWT) Profile for OAuth 2.0 Client Authentication and
-  Authorization Grants ([RFC 7523](https://datatracker.ietf.org/doc/html/rfc7523))
-- OpenID Connect Discovery 1.0
-  ([OpenID Connect Discovery](https://openid.net/specs/openid-connect-discovery-1_0.html))
-- JSON Web Key (JWK)([RFC7517](https://datatracker.ietf.org/doc/html/rfc7517))
+- **MCP Client**: the Agent in WAG.
+- **Authorization Server**: the OAuth 2.0 authorization server protecting the MCP server.
+- **MCP Server**: the Resource Server in WAG.
+- **Workload Identity Provider**: the issuer, operated by the platform the MCP client runs on, that signs the grant. An administrator registers it at the authorization server once ([Section 6](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-6)). Individual MCP clients are not registered.
 
 ## Workload Identity Federation Flow
-
-### Overview
-
-Workload Identity Federation enables autonomous MCP clients to obtain access
-tokens for MCP servers by presenting existing JWT credentials issued to them as
-workloads. The flow involves three primary entities:
-
-- **MCP Client**: An autonomous client seeking access to an MCP server,
-  possessing a JWT credential from a trusted issuer. The MCP client functions
-  as a workload within its deployment environment.
-- **Authorization Server**: The OAuth 2.0 authorization server protecting the
-  MCP server, responsible for validating workload JWTs and issuing access
-  tokens
-- **MCP Server**: The resource server that accepts access tokens issued by the
-  authorization server
-
-As a prerequisite for this flow, the authorization server MUST be configured with a set of JWT issuers (defined by a URL), which are considered 'trusted issuers'. The nature of the trusted relationship and the mechanism by which the set is populated or maintained is out of scope of this document and left up to the implementer. JWTs not issued by these trusted issuers can be safely rejected by the authorization server.
 
 ### Message Flow
 
