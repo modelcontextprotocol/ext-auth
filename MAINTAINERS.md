@@ -6,7 +6,7 @@ This document lists current maintainers of the Model Context Protocol ext-auth p
 
 ## Extension Maintainers
 
-- [Paul Carleton](https://github.com/pcarleton) (lead)
+- [Paul Carleton](https://github.com/pcarleton)
 - [Aaron Parecki](https://github.com/aaronpk)
 - [Darin McAdams](https://github.com/D-McAdams)
 - [Den Delimarsky](https://github.com/localden)
