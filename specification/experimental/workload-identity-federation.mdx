@@ -108,68 +108,11 @@ sequenceDiagram
 12. **MCP Server Response**: If the token is valid and the MCP client is authorized, the
     MCP server processes the request and returns the JSON-RPC response.
 
-## JWT Requirements
+## Workload Authorization Grant
 
-### JWT Format
+The MCP client presents a WAG: a JWT whose `typ` header is `oauth-wag+jwt`, with the claims defined in [Section 5.1](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-5.1). The `aud` claim is the issuer identifier of the authorization server, which the MCP client learns through the discovery steps of MCP Authorization.
 
-The workload JWT presented by the MCP client MUST be a signed JWT conforming to
-[RFC 7523](https://datatracker.ietf.org/doc/html/rfc7523). The JWT MUST contain
-at least the following claims:
-
-- `iss` (Issuer): Identifies the issuer of the JWT. This value is used for
-  issuer discovery and trust validation.
-- `sub` (Subject): Identifies the workload. This may be any identifier that
-  uniquely identifies the workload within the issuer's domain. Examples include
-  SPIFFE IDs, platform-specific workload identifiers, or service account names.
-- `aud` (Audience): Identifies the intended audience for the JWT. This MUST be
-  the authorization server's token endpoint URL.
-- `exp` (Expiration Time): The time after which the JWT MUST NOT be accepted.
-- `iat` (Issued At): The time at which the JWT was issued.
-- `jti` (JWT ID): A unique identifier for the JWT to prevent replay attacks.
-
-Additional claims MAY be present and MAY be used by the authorization server in
-making authorization decisions.
-
-Example JWT payload:
-
-```json
-{
-  "iss": "https://issuer.example.org",
-  "sub": "spiffe://example.org/ns/default/sa/customer-router-agent",
-  "aud": "https://auth.example.com/token",
-  "jti": "jwt-grant-id-x1y2z3a4",
-  "exp": 1744845092,
-  "iat": 1744841036
-}
-```
-
-### JWT Validation
-
-Authorization servers MUST validate the JWT according to
-[RFC 7523 Section 3](https://datatracker.ietf.org/doc/html/rfc7523#section-3),
-with the following considerations:
-
-- The `sub` (subject) claim identifies the workload but does not identify a
-  resource owner or correspond to an OAuth `client_id`.
-- The authorization server MUST verify that the issuer is trusted according to
-  its configured trust relationships.
-- The authorization server MUST verify the JWT signature using keys retrieved
-  from a TLS protected URI as described in this specification.
-- The authorization server MUST apply configured authorization rules to
-  determine whether the specific workload identified in the JWT claims should
-  receive an access token.
-
-### JWT Provisioning
-
-How MCP clients obtain their workload JWT credentials is outside the scope of
-this specification. Workload JWTs are typically provisioned by:
-
-- Workload platforms (e.g. Kubernetes)
-- SPIFFE implementations
-- Identity providers integrated with workload deployment systems
-
-The JWT provisioning mechanism relies on a separate registration or attestation
-process that establishes trust between the workload and the JWT issuer.
+How the MCP client obtains a WAG is out of scope. A platform credential that is not a WAG, such as a Kubernetes service account token or a SPIFFE JWT-SVID, is not presented to the authorization server. It can be what the MCP client uses to request a WAG from its Workload Identity Provider.
 
 ## Authorization Server Requirements
 
@@ -217,42 +160,13 @@ authorization rules.
 
 ### Token Endpoint
 
-Authorization servers supporting this extension MUST support the JWT Bearer
-grant type at their token endpoint as specified in
-[RFC 7523 Section 2.1](https://datatracker.ietf.org/doc/html/rfc7523#section-2.1).
+The MCP client makes the token request defined in [Section 5](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-5). The request **MUST** include the `resource` parameter, set to the canonical URI of the MCP server.
 
-The token endpoint MUST accept requests with:
-
-- `grant_type`: `urn:ietf:params:oauth:grant-type:jwt-bearer`
-- `assertion`: The workload JWT
-- `resource`: The target MCP server URI (as specified in the baseline MCP
-  Authorization specification)
-
-Additional parameters MAY be supported but are not required by this
-specification.
+The authorization server validates the grant as defined in [Section 6.1](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-6.1), applies its policy as defined in [Section 6.2](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-6.2), and reports errors as defined in [Section 7](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-7). The access token it issues **MUST** be audience-restricted to the MCP server named by `resource`.
 
 ### Authorization Server Metadata
 
-Authorization servers supporting this extension MUST include the
-`grant_types_supported` field in their Authorization Server Metadata as defined
-in [RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414).
-
-The `grant_types_supported` array MUST include the value
-`urn:ietf:params:oauth:grant-type:jwt-bearer`.
-
-Example Authorization Server Metadata:
-
-```json
-{
-  "issuer": "https://auth.example.com",
-  "token_endpoint": "https://auth.example.com/token",
-  "grant_types_supported": [
-    "authorization_code",
-    "refresh_token",
-    "urn:ietf:params:oauth:grant-type:jwt-bearer"
-  ]
-}
-```
+The authorization server **MUST** include `urn:ietf:params:oauth:grant-type:jwt-bearer` in the `grant_types_supported` field of its [RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414) metadata.
 
 ## MCP Server Requirements
 
@@ -274,36 +188,27 @@ Host: auth.example.com
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer
-&assertion=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNpZ25pbmcta2V5
-LTEifQ.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlLm9yZyIsInN1YiI6InNwaWZmZ
-TovL2V4YW1wbGUub3JnL25zL2RlZmF1bHQvc2EvY3VzdG9tZXItcm91dGVyLWFnZW50IiwiY
-XVkIjoiaHR0cHM6Ly9hdXRoLmV4YW1wbGUuY29tL3Rva2VuIiwianRpIjoiand0LWdyYW50L
-WlkLXgxeTJ6M2E0IiwiZXhwIjoxNzQ0ODQ1MDkyLCJpYXQiOjE3NDQ4NDEwMzZ9.EXAMPLE
-_SIGNATURE
+&assertion=eyJ0eXAiOiJvYXV0aC13YWcrand0IiwiYWxnIjoiRVMyNTYiLCJraWQiOiJzaWduaW5nLWtleS0xIn0...
 &resource=https%3A%2F%2Fmcp.example.com
 ```
 
 **Decoded JWT Assertion:**
 
-Header:
-
 ```json
 {
-  "alg": "RS256",
-  "typ": "JWT",
+  "typ": "oauth-wag+jwt",
+  "alg": "ES256",
   "kid": "signing-key-1"
 }
 ```
 
-Payload:
-
 ```json
 {
   "iss": "https://issuer.example.org",
-  "sub": "spiffe://example.org/ns/default/sa/customer-router-agent",
-  "aud": "https://auth.example.com/token",
-  "jti": "jwt-grant-id-x1y2z3a4",
-  "exp": 1744845092,
+  "sub": "wl_7f3d9a53c1",
+  "aud": "https://auth.example.com",
+  "jti": "7d0f5a2b-93c8-4f0e-9c33-1b6a0e6d5f10",
+  "exp": 1744841336,
   "iat": 1744841036
 }
 ```
