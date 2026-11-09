@@ -4,13 +4,13 @@
 
 ## Introduction
 
-Workload identity federation is an established pattern for workloads, including agents acting without human supervision, that authenticate as themselves. It has been implemented in several ways. MCP adopts the pattern and bases it on the [Workload Authorization Grant](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html) (WAG), so that an MCP server that wants workload identity federation can support one mechanism that MCP clients also implement.
+Workload identity federation (WIF) is an established industry pattern for workloads, including agents, that authenticate as a distinct principal to obtain access to systems across a trust boundary.  The WIF pattern can be implemented in several different ways, so MCP adopts the pattern and bases it on the [Workload Authorization Grant](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html) (WAG), in order to have a common mechanism across MCP clients and MCP servers.
 
-This extension lets an MCP client that runs as a workload, acting as itself rather than on behalf of a user, obtain an access token for an MCP server without client registration, a `client_id` or a long-lived credential.
+This extension lets an MCP client that runs as a workload, acting as itself rather than on behalf of a user, obtain an access token for an MCP server without requiring client registration, a `client_id` or a long-lived credential.
 
-It is a profile of WAG. Anything not stated here is as defined in WAG and in the [MCP Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization) specification. Section numbers refer to the linked editor's copy of WAG.
+Anything not stated here is as defined in WAG and in the [MCP Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization) specification. Section numbers refer to the linked editor's copy of WAG.
 
-This does not preclude other mechanisms. Clients and servers can already use their own through MCP's extensibility, and MCP may adopt others in the future.
+This does not preclude other WIF implementations. Clients and servers can already use their own WIF implementations through MCP's extensibility, and MCP may adopt other implementations in the future.
 
 ## Roles
 
@@ -69,6 +69,7 @@ Header and claims of the `assertion`:
 {
   "iss": "https://issuer.example.org",
   "sub": "wl_7f3d9a53c1",
+  "tenant": "ten_AdkZdfja",
   "aud": "https://auth.example.com",
   "jti": "7d0f5a2b-93c8-4f0e-9c33-1b6a0e6d5f10",
   "exp": 1744841336,
