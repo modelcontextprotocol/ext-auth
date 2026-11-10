@@ -254,7 +254,7 @@ In addition, MCP servers MUST provide DPoP proof replay protection as described 
 
 The ±5 minute bound balances security and usability. MCP servers MAY enforce a narrower window within it, but should be aware that overly restrictive windows may cause operational issues due to clock skew in distributed systems.
 
-For high-security environments, MCP servers SHOULD implement server-provided nonces as described in [RFC 9449 Section 9](https://datatracker.ietf.org/doc/html/rfc9449#section-9) to further limit proof lifetime, even if it is stateless (see {{stateless-replay-protection}}).
+For high-security environments, MCP servers SHOULD implement server-provided nonces as described in [RFC 9449 Section 9](https://datatracker.ietf.org/doc/html/rfc9449#section-9) to further limit proof lifetime, even if it is stateless (see [Stateless Operation and DPoP Proof Replay Protection](#stateless-operation-and-dpop-proof-replay-protection)).
 
 ### Key Storage
 
