@@ -23,7 +23,7 @@ This does not preclude other WIF implementations. Clients and servers can alread
 
 The MCP client presents a WAG: a JWT whose `typ` header is `oauth-wag+jwt`, with the claims defined in [Section 5.1](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-5.1). The `aud` claim is the issuer identifier of the authorization server, which the MCP client learns through the discovery steps of MCP Authorization.
 
-How the MCP client obtains a WAG is out of scope. A platform credential that is not a WAG, such as a Kubernetes service account token or a SPIFFE JWT-SVID, is not presented to the authorization server. It can be what the MCP client uses to request a WAG from its Workload Identity Provider.
+How the MCP client obtains a WAG is out of scope. A client might, for example, use a Kubernetes service account token or SPIFFE JWT-SVID with its Workload Identity Provider to obtain a WAG. Using a JWT that does not conform to [Section 5](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-5) as a WAG is not conformant with this specification. 
 
 ## Authorization Server Requirements
 
