@@ -90,7 +90,7 @@ When rejecting a request, the MCP server SHOULD use the `invalid_dpop_proof` err
 
 A DPoP-bound access token is sender-constrained and MUST NOT be usable as a bearer token. MCP servers MUST NOT accept a DPoP-bound access token presented using the `Bearer` authentication scheme (see [RFC 9449 Section 7.2](https://datatracker.ietf.org/doc/html/rfc9449#section-7.2)). The MCP server MUST reject such a request with an HTTP 401 response that includes a `WWW-Authenticate` challenge using the `Bearer` ([RFC 6750 Section 3](https://datatracker.ietf.org/doc/html/rfc6750#section-3)) or `DPoP` ([RFC 9449 Section 7.1](https://datatracker.ietf.org/doc/html/rfc9449#section-7.1)) scheme, and SHOULD indicate the `invalid_token` error code ([RFC 6750 Section 3.1](https://datatracker.ietf.org/doc/html/rfc6750#section-3.1)).
 
-### Stateless Operation and DPoP Proof Replay Protection {#stateless-replay-protection}
+### Stateless Operation and DPoP Proof Replay Protection
 
 [RFC 9449 Section 11.1](https://www.rfc-editor.org/rfc/rfc9449.html#name-dpop-proof-replay) provides specific guidance on replay protection mechanisms that adress the risks of a DPoP Proofs being replayed.
 
