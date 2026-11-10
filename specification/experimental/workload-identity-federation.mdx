@@ -1,0 +1,82 @@
+# Workload Identity Federation
+
+**Authors**: Paul Carleton (Anthropic), Pieter Kasselman (Defakto)
+
+## Introduction
+
+Workload identity federation (WIF) is an established industry pattern for workloads, including agents, that authenticate as a distinct principal to obtain access to systems across a trust boundary.  The WIF pattern can be implemented in several different ways, so MCP adopts the pattern and bases it on the [Workload Authorization Grant](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html) (WAG), in order to have a common mechanism across MCP clients and MCP servers.
+
+This extension lets an MCP client that runs as a workload, acting as itself rather than on behalf of a user, obtain an access token for an MCP server without requiring client registration, a `client_id` or a long-lived credential.
+
+Anything not stated here is as defined in WAG and in the [MCP Authorization](https://modelcontextprotocol.io/specification/draft/basic/authorization) specification. Section numbers refer to the linked editor's copy of WAG.
+
+This does not preclude other WIF implementations. Clients and servers can already use their own WIF implementations through MCP's extensibility, and MCP may adopt other implementations in the future.
+
+## Roles
+
+- **MCP Client**: the Agent in WAG.
+- **Authorization Server**: the OAuth 2.0 authorization server protecting the MCP server.
+- **MCP Server**: the Resource Server in WAG.
+- **Workload Identity Provider**: the issuer that signs the grant that is used by the MCP client. An administrator registers it at the authorization server once ([Section 6](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-6)). Individual MCP clients are not registered.
+
+## Workload Authorization Grant
+
+The MCP client presents a WAG: a JWT whose `typ` header is `oauth-wag+jwt`, with the claims defined in [Section 5.1](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-5.1). The `aud` claim is the issuer identifier of the authorization server, which the MCP client learns through the discovery steps of MCP Authorization.
+
+How the MCP client obtains a WAG is out of scope. A client might, for example, use a Kubernetes service account token or SPIFFE JWT-SVID with its Workload Identity Provider to obtain a WAG. Using a JWT that does not conform to [Section 5](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-5) as a WAG is not conformant with this specification. 
+
+## Authorization Server Requirements
+
+### Token Endpoint
+
+The MCP client makes the token request defined in [Section 5](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-5). The request **MUST** include the `resource` parameter, set to the canonical URI of the MCP server.
+
+The authorization server validates the grant as defined in [Section 6.1](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-6.1), applies its policy as defined in [Section 6.2](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-6.2), and reports errors as defined in [Section 7](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-7). The access token it issues **MUST** be audience-restricted to the MCP server named by `resource`.
+
+### Authorization Server Metadata
+
+The authorization server **MUST** include `urn:ietf:params:oauth:grant-type:jwt-bearer` in the `grant_types_supported` field of its [RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414) metadata.
+
+## MCP Server Requirements
+
+This extension adds no requirements for MCP servers. They validate access tokens as defined in MCP Authorization.
+
+## Example
+
+Token request:
+
+```http
+POST /token HTTP/1.1
+Host: auth.example.com
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer
+&assertion=eyJ0eXAiOiJvYXV0aC13YWcrand0IiwiYWxnIjoiRVMyNTYiLCJraWQiOiJzaWduaW5nLWtleS0xIn0...
+&resource=https%3A%2F%2Fmcp.example.com
+```
+
+Header and claims of the `assertion`:
+
+```json
+{
+  "typ": "oauth-wag+jwt",
+  "alg": "ES256",
+  "kid": "signing-key-1"
+}
+```
+
+```json
+{
+  "iss": "https://issuer.example.org",
+  "sub": "wl_7f3d9a53c1",
+  "tenant": "ten_AdkZdfja",
+  "aud": "https://auth.example.com",
+  "jti": "7d0f5a2b-93c8-4f0e-9c33-1b6a0e6d5f10",
+  "exp": 1744841336,
+  "iat": 1744841036
+}
+```
+
+## Security Considerations
+
+The security considerations in [Section 9](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-9) of WAG and in MCP Authorization apply.
