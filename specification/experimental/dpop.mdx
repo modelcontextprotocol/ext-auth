@@ -225,7 +225,8 @@ When validation fails, the MCP server returns an error response:
 ```
 HTTP/1.1 401 Unauthorized
 WWW-Authenticate: DPoP error="invalid_dpop_proof",
-  error_description="Content digest mismatch"
+  error_description="DPoP proof htu does not match the request URI",
+  algs="ES256 PS256"
 Content-Type: application/json
 
 {
