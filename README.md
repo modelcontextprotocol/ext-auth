@@ -18,6 +18,12 @@ The directory that holds an extension's specification shows its stage: `specific
 - [Enterprise-Managed Authorization](./specification/stable/enterprise-managed-authorization/2026-07-28/enterprise-managed-authorization.mdx) ([draft](./specification/stable/enterprise-managed-authorization/draft/enterprise-managed-authorization.mdx))
 - [OAuth Client Credentials](./specification/stable/oauth-client-credentials/2026-07-28/oauth-client-credentials.mdx) ([draft](./specification/stable/oauth-client-credentials/draft/oauth-client-credentials.mdx))
 
+### Experimental
+
+Experimental extensions may change or be withdrawn at any time, without notice.
+
+- [DPoP Profile for MCP](./specification/experimental/dpop.mdx)
+
 ## Governance
 
 This repository follows the [Model Context Protocol Governance](https://modelcontextprotocol.io/community/governance) process, with a dedicated set of Extension Maintainers for authorization extensions, listed in [MAINTAINERS.md](./MAINTAINERS.md). The extensions are associated with the [Authorization Interest Group](https://modelcontextprotocol.io/community/interest-groups/auth).
