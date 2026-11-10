@@ -80,7 +80,7 @@ RFC 9449 describes the client's retry in non-normative terms ("the client is exp
 
 ### MCP Server Validation
 
-MCP servers MUST validate DPoP proofs according to [RFC 9449 Section 4.3](https://datatracker.ietf.org/doc/html/rfc9449#section-4.3). Implementations conforming to this specification MUST reject DPoP proofs whose `iat` claim falls outside ±5 minutes of the server's current time. Servers MAY enforce a narrower acceptance window (see {{proof-validity-window}}).
+MCP servers MUST validate DPoP proofs according to [RFC 9449 Section 4.3](https://datatracker.ietf.org/doc/html/rfc9449#section-4.3). Implementations conforming to this specification MUST reject DPoP proofs whose `iat` claim falls outside ±5 minutes of the server's current time. Servers MAY enforce a narrower acceptance window (see [Proof Validity Window](#proof-validity-window)).
 
 If any validation step fails, the MCP server MUST reject the request with an HTTP 401 response and include appropriate error information in the `WWW-Authenticate` header as specified in [RFC 9449 Section 7.1](https://datatracker.ietf.org/doc/html/rfc9449#section-7.1).
 
