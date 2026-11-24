@@ -220,7 +220,28 @@ DPoP: eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0eSI6...
 
 ### Error Response Examples
 
-When validation fails, the MCP server returns an error response:
+When the MCP server requires a nonce, it responds with the `use_dpop_nonce` error code and supplies the nonce in the `DPoP-Nonce` header, as described in [RFC 9449 Section 9](https://datatracker.ietf.org/doc/html/rfc9449#section-9):
+
+```
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: DPoP error="use_dpop_nonce",
+  error_description="Resource server requires nonce in DPoP proof",
+  algs="ES256 PS256",
+  resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp"
+DPoP-Nonce: eyJ7S_zG.eyJH0-Z.HX4w-7v
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "error": {
+    "code": -32001,
+    "message": "Unauthorized"
+  },
+  "id": 1
+}
+```
+
+When proof validation fails, the MCP server returns an error response:
 
 ```
 HTTP/1.1 401 Unauthorized
