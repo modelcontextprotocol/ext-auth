@@ -247,7 +247,8 @@ When proof validation fails, the MCP server returns an error response:
 HTTP/1.1 401 Unauthorized
 WWW-Authenticate: DPoP error="invalid_dpop_proof",
   error_description="DPoP proof htu does not match the request URI",
-  algs="ES256 PS256"
+  algs="ES256 PS256",
+  resource_metadata="https://mcp.example.com/.well-known/oauth-protected-resource/mcp"
 Content-Type: application/json
 
 {
