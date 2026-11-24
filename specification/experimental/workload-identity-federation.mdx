@@ -35,7 +35,18 @@ The authorization server validates the grant as defined in [Section 6.1](https:/
 
 ### Authorization Server Metadata
 
-The authorization server **MUST** include `urn:ietf:params:oauth:grant-type:jwt-bearer` in the `grant_types_supported` field of its [RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414) metadata.
+The authorization server **MUST** include `urn:ietf:params:oauth:grant-profile:wag` in the `authorization_grant_profiles_supported` field of its [RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414) metadata, as defined in [Section 8](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#as-metadata). The authorization server **MUST** also include `urn:ietf:params:oauth:grant-type:jwt-bearer` in the `grant_types_supported` field. The grant type alone does not distinguish WAG from other JWT assertion profiles; the grant profile does.
+
+```json
+{
+  "issuer": "https://auth.example.com",
+  "token_endpoint": "https://auth.example.com/token",
+  "grant_types_supported": ["urn:ietf:params:oauth:grant-type:jwt-bearer"],
+  "authorization_grant_profiles_supported": [
+    "urn:ietf:params:oauth:grant-profile:wag"
+  ]
+}
+```
 
 ## MCP Server Requirements
 
@@ -79,4 +90,4 @@ Header and claims of the `assertion`:
 
 ## Security Considerations
 
-The security considerations in [Section 9](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#section-9) of WAG and in MCP Authorization apply.
+The security considerations in [Section 10](https://pcarleton.github.io/draft-carleton-workload-authz-grant/draft-carleton-workload-authz-grant.html#security-considerations) of WAG and in MCP Authorization apply.
