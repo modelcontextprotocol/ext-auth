@@ -92,7 +92,7 @@ A DPoP-bound access token is sender-constrained and MUST NOT be usable as a bear
 
 ### Stateless Operation and DPoP Proof Replay Protection
 
-[RFC 9449 Section 11.1](https://www.rfc-editor.org/rfc/rfc9449.html#name-dpop-proof-replay) provides specific guidance on replay protection mechanisms that adress the risks of a DPoP Proofs being replayed.
+[RFC 9449 Section 11.1](https://www.rfc-editor.org/rfc/rfc9449.html#name-dpop-proof-replay) provides specific guidance on replay protection mechanisms that address the risk of a DPoP proof being replayed. The replay risks specific to MCP, and guidance on choosing among the available mitigations, are discussed in [DPoP Proof Replay](#dpop-proof-replay) under Security Considerations.
 
 MCP servers are NOT required to track `jti` values, however, MCP servers MAY choose to implement `jti` tracking for additional security, following the guidance in [RFC 9449 Section 11.1](https://datatracker.ietf.org/doc/html/rfc9449#section-11.1).
 
